@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+dist/
+build/
+.env
+.env.local
+.env.production
+*.log
+client/dist/
+server/dist/
+.gemini/
+.system_generated/
