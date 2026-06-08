@@ -4,7 +4,8 @@ import { popularCharacters } from './data/characters';
 import { audioService } from './services/audio';
 import { 
   Volume2, VolumeX, Copy, Check, Users, Crown, LogOut, 
-  Play, Send, Heart, X, Check as CheckIcon, RotateCcw, MessageSquare
+  Play, Send, Heart, X, Check as CheckIcon, RotateCcw, MessageSquare,
+  UserX
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -139,7 +140,7 @@ function GameApp() {
     room, playerId, playerName, error, alert, isMuted,
     clearError, clearAlert, createRoom, joinRoom, submitSuggestions,
     submitQuestion, submitQuestionReaction, skipGuessing, guessNow, submitGuess,
-    submitGuessReaction, startGame, restartGame, toggleMute, leaveRoom
+    startGame, restartGame, toggleMute, leaveRoom, kickPlayer
   } = useGame();
 
   const [inputName, setInputName] = useState(playerName || '');
@@ -460,7 +461,7 @@ function GameApp() {
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col">
         <div className="flex justify-between items-center mb-6">
-          <button onClick={leaveRoom} className="btn-pirate px-3 py-2 text-sm border-red-800 bg-red-950 text-red-100">
+          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2 text-sm">
             <LogOut className="w-4 h-4" /> Keluar
           </button>
           <h1 className="heading-pirate text-2xl flex items-center gap-1 m-0">
@@ -519,9 +520,20 @@ function GameApp() {
                   {room.hostId === p.id && <Crown className="w-4 h-4 text-amber-600" />}
                   {p.name} {p.id === playerId ? '(Anda)' : ''}
                 </span>
-                <span className={`text-xs px-2 py-1 rounded font-serif ${p.socketId ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
-                  {p.socketId ? 'Online' : 'Offline'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-1 rounded font-serif ${p.socketId ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
+                    {p.socketId ? 'Online' : 'Offline'}
+                  </span>
+                  {isHost && p.id !== playerId && (
+                    <button 
+                      onClick={() => kickPlayer(p.id)}
+                      className="p-1 rounded bg-red-950/40 text-red-400 hover:bg-red-900/40 hover:text-red-200 border border-red-800 transition-colors flex items-center justify-center"
+                      title="Tendang Pemain"
+                    >
+                      <UserX className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -552,9 +564,17 @@ function GameApp() {
     
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col">
-        <h1 className="heading-pirate text-2xl flex items-center justify-center gap-1 mb-6">
-          🐌 Den Den Trivia
-        </h1>
+        <div className="flex justify-between items-center mb-6">
+          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2 text-sm">
+            <LogOut className="w-4 h-4" /> Keluar
+          </button>
+          <h1 className="heading-pirate text-2xl flex items-center gap-1 m-0">
+            🐌 Den Den Trivia
+          </h1>
+          <div className="relative w-8 h-8">
+            {renderMuteToggle()}
+          </div>
+        </div>
 
         {error && (
           <div className="alert-banner alert-danger">
@@ -567,7 +587,6 @@ function GameApp() {
         <div className="game-layout-grid">
           <div className="game-column-main">
             <div className="logbook-card mb-6">
-              {renderMuteToggle()}
               <h2 className="heading-pirate text-xl text-left border-b border-amber-950 pb-2 mb-4">
                 Usulkan Tokoh One Piece
               </h2>
@@ -694,8 +713,8 @@ function GameApp() {
         )}
 
         <div className="flex justify-between items-center mb-4">
-          <button onClick={leaveRoom} className="btn-pirate px-2 py-1 text-xs border-red-800 bg-red-950 text-red-100">
-            Keluar
+          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-2 py-1 text-xs">
+            <LogOut className="w-3.5 h-3.5" /> Keluar
           </button>
           
           <div className="wanted-poster py-1 px-4 border-2 rounded">
@@ -890,63 +909,7 @@ function GameApp() {
                 </div>
               )}
 
-              {/* FASE 4: VOTING_GUESS (Guess is made, others vote Benar/Salah) */}
-              {room.turnPhase === 'VOTING_GUESS' && room.activeGuess && (
-                <div className="w-full text-center space-y-4">
-                  <div className="text-xs font-serif uppercase tracking-wider text-amber-800">Tebakan Karakter</div>
-                  <h3 className="text-2xl font-black text-amber-950 font-serif m-0">
-                    "{room.activeGuess.characterName}"
-                  </h3>
-
-                  <TimerCountdown expiryEpoch={room.timerEndEpoch} />
-
-                  <div className="space-y-1">
-                    <p className="text-xs font-bold text-amber-950 font-serif text-left">Penilaian Kru:</p>
-                    <div className="flex flex-wrap gap-1.5 justify-start text-xs font-serif">
-                      {room.players
-                        .filter((p) => p.id !== activePlayer.id)
-                        .map((p) => {
-                          const reaction = room.activeGuess!.reactions[p.id];
-                          return (
-                            <div key={p.id} className="bg-amber-200/50 px-2.5 py-1 rounded border border-amber-800/20 flex items-center gap-1">
-                              {p.name}: 
-                              {reaction === 'benar' && <CheckIcon className="w-3.5 h-3.5 text-green-700" />}
-                              {reaction === 'salah' && <X className="w-3.5 h-3.5 text-red-700" />}
-                              {!reaction && <span className="font-bold">?</span>}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-
-                  {isMeActive ? (
-                    <p className="text-xs text-amber-700 font-serif italic pt-2">
-                      Menunggu kru lain memvalidasi tebakan Anda... (Minimal 1 centang benar menyatakan jawaban Anda BENAR).
-                    </p>
-                  ) : (
-                    <div className="space-y-3 pt-2 border-t border-amber-950/20">
-                      <p className="text-xs text-amber-700 font-serif italic">
-                        Apakah karakter rahasia {activePlayer?.name} benar adalah "{room.activeGuess.characterName}"? (Karakter usulan yang mereka tebak)
-                      </p>
-                      
-                      <div className="grid grid-cols-2 gap-3">
-                        <button 
-                          onClick={() => submitGuessReaction('salah')}
-                          className={`btn-pirate py-3 text-sm flex items-center justify-center gap-1 ${room.activeGuess.reactions[playerId!] === 'salah' ? 'bg-red-950 border-red-500 text-red-100' : ''}`}
-                        >
-                          <X className="w-4 h-4" /> Salah
-                        </button>
-                        <button 
-                          onClick={() => submitGuessReaction('benar')}
-                          className={`btn-pirate btn-pirate-gold py-3 text-sm flex items-center justify-center gap-1 ${room.activeGuess.reactions[playerId!] === 'benar' ? 'bg-green-950 border-green-500 text-green-100' : ''}`}
-                        >
-                          <CheckIcon className="w-4 h-4" /> Benar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Voting Guess layout removed since guessing is evaluated instantly on the server */}
 
             </div>
           </div>
@@ -1108,8 +1071,8 @@ function GameApp() {
                 </div>
               )}
               
-              <button onClick={leaveRoom} className="btn-pirate w-full py-3 bg-transparent border-amber-900 text-amber-900">
-                Kembali ke Menu Utama
+              <button onClick={leaveRoom} className="btn-pirate btn-pirate-red w-full py-3">
+                <LogOut className="w-4 h-4" /> Kembali ke Menu Utama
               </button>
             </div>
           </div>

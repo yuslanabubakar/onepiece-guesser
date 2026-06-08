@@ -62,11 +62,11 @@ interface GameContextType {
   skipGuessing: () => void;
   guessNow: () => void;
   submitGuess: (characterName: string) => void;
-  submitGuessReaction: (reaction: 'benar' | 'salah') => void;
   startGame: () => void;
   restartGame: () => void;
   toggleMute: () => void;
   leaveRoom: () => void;
+  kickPlayer: (targetPlayerId: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -156,6 +156,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       audioService.playWrong();
     });
 
+    newSocket.on('kicked', () => {
+      localStorage.removeItem('denden_roomId');
+      setRoom(null);
+      setError('Anda telah ditendang dari room oleh Host');
+      audioService.playWrong();
+    });
+
     newSocket.on('error', (msg: string) => {
       setError(msg);
       audioService.playWrong();
@@ -232,12 +239,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const submitGuessReaction = (reaction: 'benar' | 'salah') => {
-    if (socket && room && playerId) {
-      socket.emit('submit_guess_reaction', { roomId: room.id, playerId, reaction });
-    }
-  };
-
   const startGame = () => {
     if (socket && room && playerId) {
       socket.emit('start_game', { roomId: room.id, playerId });
@@ -255,11 +256,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
   };
 
   const leaveRoom = () => {
+    if (socket && room && playerId) {
+      socket.emit('leave_room', { roomId: room.id, playerId });
+    }
     localStorage.removeItem('denden_roomId');
     setRoom(null);
-    if (socket) {
-      socket.disconnect();
-      socket.connect(); // Reconnect socket to a fresh state
+  };
+
+  const kickPlayer = (targetPlayerId: string) => {
+    if (socket && room && playerId) {
+      socket.emit('kick_player', { roomId: room.id, playerId, targetPlayerId });
     }
   };
 
@@ -283,11 +289,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
         skipGuessing,
         guessNow,
         submitGuess,
-        submitGuessReaction,
         startGame,
         restartGame,
         toggleMute,
         leaveRoom,
+        kickPlayer,
       }}
     >
       {children}

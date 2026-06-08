@@ -58,6 +58,8 @@ interface Room {
 const rooms: { [roomId: string]: Room } = {};
 // Active timeouts for timers to avoid multiple schedules colliding
 const roomTimeouts: { [roomId: string]: NodeJS.Timeout } = {};
+// Host transfer timeouts to delay transferring host on disconnect
+const hostTransferTimeouts: { [roomId: string]: NodeJS.Timeout } = {};
 
 const MAX_PLAYERS = 7;
 const THINK_TIME_MS = 45000;
@@ -175,68 +177,7 @@ function startGuessingTimer(roomId: string) {
   }, GUESS_TIME_MS);
 }
 
-// Start the 15-second voting timer
-function startVotingTimer(roomId: string) {
-  const room = rooms[roomId];
-  if (!room) return;
-
-  clearRoomTimeout(roomId);
-  room.turnPhase = 'VOTING_GUESS';
-  room.timerDuration = VOTE_TIME_MS;
-  room.timerEndEpoch = Date.now() + VOTE_TIME_MS;
-  broadcastRoomState(roomId);
-
-  roomTimeouts[roomId] = setTimeout(() => {
-    evaluateGuessVotes(roomId);
-  }, VOTE_TIME_MS);
-}
-
-// Evaluate the guess reactions
-function evaluateGuessVotes(roomId: string) {
-  const room = rooms[roomId];
-  if (!room || !room.activeGuess) return;
-
-  clearRoomTimeout(roomId);
-  const activePlayer = room.players[room.turnIndex];
-
-  // Check if correct via manual vote (at least one 'benar' reaction)
-  const votes = Object.values(room.activeGuess.reactions);
-  const votedCorrect = votes.includes('benar');
-
-  // Check if correct via auto-matching the character name
-  const autoCorrect = activePlayer.assignedCharacter
-    ? isGuessCorrect(room.activeGuess.characterName, activePlayer.assignedCharacter)
-    : false;
-
-  const isCorrect = votedCorrect || autoCorrect;
-
-  if (isCorrect) {
-    activePlayer.hasGuessedCorrectly = true;
-    if (room.gameStartEpoch) {
-      activePlayer.guessTimeMs = Date.now() - room.gameStartEpoch;
-    }
-    io.to(roomId).emit('game_alert', {
-      type: 'success',
-      message: `${activePlayer.name} berhasil menebak karakternya: ${room.activeGuess.characterName}!`,
-    });
-  } else {
-    activePlayer.guessesCount += 1;
-    if (activePlayer.guessesCount >= 3) {
-      activePlayer.failedToGuess = true;
-      io.to(roomId).emit('game_alert', {
-        type: 'danger',
-        message: `${activePlayer.name} gagal menebak dan telah kehabisan kesempatan! Karakter aslinya adalah: ${activePlayer.assignedCharacter}`,
-      });
-    } else {
-      io.to(roomId).emit('game_alert', {
-        type: 'info',
-        message: `Tebakan ${activePlayer.name} (${room.activeGuess.characterName}) salah! Kesempatan tersisa: ${3 - activePlayer.guessesCount}`,
-      });
-    }
-  }
-
-  advanceTurn(roomId);
-}
+// Voting phase is removed, guess is evaluated immediately
 
 io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`);
@@ -295,10 +236,15 @@ io.on('connection', (socket: Socket) => {
 
       // Check if player is already in room (reconnect or duplicate tab)
       let player = room.players.find(
-        (p) =>
-          (playerId && p.id === playerId) ||
-          (p.name.toLowerCase() === playerName.trim().toLowerCase() && p.socketId === null)
+        (p) => playerId && p.id === playerId
       );
+
+      // If in LOBBY, we can also match by name if the player was disconnected (to allow simple name-based re-entry)
+      if (!player && room.status === 'LOBBY') {
+        player = room.players.find(
+          (p) => p.name.toLowerCase() === playerName.trim().toLowerCase() && p.socketId === null
+        );
+      }
 
       if (!player && room.status !== 'LOBBY') {
         socket.emit('error', 'Game sudah dimulai, tidak bisa bergabung');
@@ -307,6 +253,14 @@ io.on('connection', (socket: Socket) => {
 
       if (player) {
         player.socketId = socket.id;
+        // Clear host transfer timeout if this player is the host
+        if (room.hostId === player.id) {
+          if (hostTransferTimeouts[id]) {
+            clearTimeout(hostTransferTimeouts[id]);
+            delete hostTransferTimeouts[id];
+            console.log(`Cancelled host transfer timeout for room ${id} as host joined.`);
+          }
+        }
       } else {
         if (room.players.length >= MAX_PLAYERS) {
           socket.emit('error', `Room penuh! Maksimal ${MAX_PLAYERS} pemain`);
@@ -350,6 +304,15 @@ io.on('connection', (socket: Socket) => {
       return;
     }
 
+    // Clear host transfer timeout if this player is the host and reconnecting
+    if (room.hostId === playerId) {
+      if (hostTransferTimeouts[roomId]) {
+        clearTimeout(hostTransferTimeouts[roomId]);
+        delete hostTransferTimeouts[roomId];
+        console.log(`Cancelled host transfer timeout for room ${roomId} as host reconnected.`);
+      }
+    }
+
     player.socketId = socket.id;
     socket.join(roomId);
     socket.emit('reconnected', room);
@@ -390,20 +353,26 @@ io.on('connection', (socket: Socket) => {
       player.suggestions = suggestions.map((s) => s.trim()).filter((s) => s !== '').slice(0, 3);
       broadcastRoomState(roomId);
 
-      // Check if all players have submitted at least 1 suggestion
-      const allSubmitted = room.players.every((p) => p.suggestions.length > 0);
+      // Check if all active players have submitted at least 1 suggestion
+      const activePlayers = room.players.filter((p) => !p.failedToGuess);
+      const allSubmitted = activePlayers.every((p) => p.suggestions.length > 0);
       if (allSubmitted) {
         // Try to assign characters
-        const assignments = assignCharacters(room.players);
+        const assignments = assignCharacters(activePlayers);
         if (assignments) {
           // Success! Assign characters and start playing
           room.players.forEach((p) => {
-            p.assignedCharacter = assignments[p.id];
+            if (p.failedToGuess) {
+              p.assignedCharacter = null;
+            } else {
+              p.assignedCharacter = assignments[p.id];
+            }
             p.guessTimeMs = null;
           });
           room.status = 'PLAYING';
           room.gameStartEpoch = Date.now();
-          room.turnIndex = 0;
+          const firstActiveIndex = room.players.findIndex((p) => !p.failedToGuess);
+          room.turnIndex = firstActiveIndex !== -1 ? firstActiveIndex : 0;
           room.turnPhase = 'ASKING';
           io.to(roomId).emit('game_alert', {
             type: 'info',
@@ -515,43 +484,212 @@ io.on('connection', (socket: Socket) => {
       const activePlayer = room.players[room.turnIndex];
       if (activePlayer.id !== playerId) return;
 
-      room.activeGuess = {
-        characterName: characterName.trim(),
-        reactions: {},
-      };
+      clearRoomTimeout(roomId);
 
-      // Stop think timer and start voting timer
-      startVotingTimer(roomId);
+      const guessName = characterName.trim();
+      const isCorrect = activePlayer.assignedCharacter
+        ? isGuessCorrect(guessName, activePlayer.assignedCharacter)
+        : false;
+
+      if (isCorrect) {
+        activePlayer.hasGuessedCorrectly = true;
+        if (room.gameStartEpoch) {
+          activePlayer.guessTimeMs = Date.now() - room.gameStartEpoch;
+        }
+        io.to(roomId).emit('game_alert', {
+          type: 'success',
+          message: `${activePlayer.name} berhasil menebak karakternya: ${guessName}!`,
+        });
+      } else {
+        activePlayer.guessesCount += 1;
+        if (activePlayer.guessesCount >= 3) {
+          activePlayer.failedToGuess = true;
+          io.to(roomId).emit('game_alert', {
+            type: 'danger',
+            message: `${activePlayer.name} gagal menebak dan telah kehabisan kesempatan! Karakter aslinya adalah: ${activePlayer.assignedCharacter}`,
+          });
+        } else {
+          io.to(roomId).emit('game_alert', {
+            type: 'info',
+            message: `Tebakan ${activePlayer.name} (${guessName}) salah! Kesempatan tersisa: ${3 - activePlayer.guessesCount}`,
+          });
+        }
+      }
+
+      advanceTurn(roomId);
     }
   );
 
-  // Submit Guess Reaction (Other players vote if guess is correct or wrong)
-  socket.on(
-    'submit_guess_reaction',
-    ({ roomId, playerId, reaction }: { roomId: string; playerId: string; reaction: 'benar' | 'salah' }) => {
-      const room = rooms[roomId];
-      if (!room || !room.activeGuess) return;
+  // Leave Room
+  socket.on('leave_room', ({ roomId, playerId }: { roomId: string; playerId: string }) => {
+    const room = rooms[roomId];
+    if (!room) return;
 
-      // Guessing player cannot react to their own guess
-      const activePlayer = room.players[room.turnIndex];
-      if (activePlayer.id === playerId) return;
+    const playerIndex = room.players.findIndex((p) => p.id === playerId);
+    if (playerIndex === -1) return;
 
-      room.activeGuess.reactions[playerId] = reaction;
+    const player = room.players[playerIndex];
+    console.log(`Player ${player.name} explicitly left room ${roomId}`);
 
-      // Check if all connected other players have voted
-      const otherPlayers = room.players.filter(
-        (p) => p.id !== activePlayer.id && p.socketId !== null
-      );
-      const allVoted = otherPlayers.every((p) => room.activeGuess!.reactions[p.id] !== undefined);
-
-      // If at least one player voted "benar", we can end voting early
-      if (reaction === 'benar') {
-        evaluateGuessVotes(roomId);
-      } else if (allVoted) {
-        evaluateGuessVotes(roomId);
+    if (room.status === 'LOBBY') {
+      // In LOBBY, remove the player completely
+      room.players.splice(playerIndex, 1);
+      
+      // If room is empty, clean it up
+      const allDisconnected = room.players.every((p) => p.socketId === null);
+      if (room.players.length === 0 || allDisconnected) {
+        clearRoomTimeout(roomId);
+        if (hostTransferTimeouts[roomId]) {
+          clearTimeout(hostTransferTimeouts[roomId]);
+          delete hostTransferTimeouts[roomId];
+        }
+        delete rooms[roomId];
+        console.log(`Cleaned up empty room: ${roomId}`);
       } else {
+        // If the player who left was the host, reassign host
+        if (room.hostId === playerId) {
+          // Clear any pending host transfer timeout
+          if (hostTransferTimeouts[roomId]) {
+            clearTimeout(hostTransferTimeouts[roomId]);
+            delete hostTransferTimeouts[roomId];
+          }
+          const nextHost = room.players.find((p) => p.socketId !== null);
+          if (nextHost) {
+            room.hostId = nextHost.id;
+            io.to(roomId).emit('game_alert', {
+              type: 'info',
+              message: `${nextHost.name} sekarang menjadi Host Room.`,
+            });
+          }
+        }
+        io.to(roomId).emit('player_left', { name: player.name });
         broadcastRoomState(roomId);
       }
+    } else {
+      // In SUGGESTING, PLAYING, or GAME_OVER, mark them as gugur/failedToGuess
+      player.failedToGuess = true;
+      player.socketId = null;
+      
+      io.to(roomId).emit('game_alert', {
+        type: 'danger',
+        message: `${player.name} telah keluar dari permainan dan dianggap gugur!`,
+      });
+
+      // If they were the host, reassign host
+      if (room.hostId === playerId) {
+        if (hostTransferTimeouts[roomId]) {
+          clearTimeout(hostTransferTimeouts[roomId]);
+          delete hostTransferTimeouts[roomId];
+        }
+        const nextHost = room.players.find((p) => p.socketId !== null);
+        if (nextHost) {
+          room.hostId = nextHost.id;
+          io.to(roomId).emit('game_alert', {
+            type: 'info',
+            message: `${nextHost.name} sekarang menjadi Host Room.`,
+          });
+        }
+      }
+
+      // If SUGGESTING phase, check if remaining players have all submitted suggestions
+      if (room.status === 'SUGGESTING') {
+        const activePlayers = room.players.filter((p) => !p.failedToGuess);
+        const allSubmitted = activePlayers.every((p) => p.suggestions.length > 0);
+        if (allSubmitted && activePlayers.length >= 2) {
+          const assignments = assignCharacters(activePlayers);
+          if (assignments) {
+            room.players.forEach((p) => {
+              if (p.failedToGuess) {
+                p.assignedCharacter = null;
+              } else {
+                p.assignedCharacter = assignments[p.id];
+              }
+              p.guessTimeMs = null;
+            });
+            room.status = 'PLAYING';
+            room.gameStartEpoch = Date.now();
+            const firstActiveIndex = room.players.findIndex((p) => !p.failedToGuess);
+            room.turnIndex = firstActiveIndex !== -1 ? firstActiveIndex : 0;
+            room.turnPhase = 'ASKING';
+            io.to(roomId).emit('game_alert', {
+              type: 'info',
+              message: 'Semua karakter telah dibagikan! Mulai tebak karakter Anda!',
+            });
+          } else {
+            io.to(roomId).emit('assignment_failed', 'Karakter bentrok! Kurang variasi karakter unik. Mohon host meminta pemain merubah usulan.');
+            room.players.forEach((p) => {
+              p.suggestions = [];
+            });
+          }
+        } else if (activePlayers.length < 2) {
+          room.status = 'GAME_OVER';
+          room.turnPhase = 'NONE';
+          io.to(roomId).emit('game_alert', {
+            type: 'danger',
+            message: 'Pemain aktif kurang dari 2, permainan berakhir.',
+          });
+        }
+      }
+
+      // If PLAYING phase, handle turn advancement
+      if (room.status === 'PLAYING') {
+        const activePlayer = room.players[room.turnIndex];
+        if (activePlayer && activePlayer.id === playerId) {
+          advanceTurn(roomId);
+        } else {
+          const remainingActive = room.players.filter((p) => !p.hasGuessedCorrectly && !p.failedToGuess);
+          if (remainingActive.length === 0) {
+            room.status = 'GAME_OVER';
+            room.turnPhase = 'NONE';
+            room.timerEndEpoch = null;
+            room.timerDuration = null;
+          }
+        }
+      }
+
+      broadcastRoomState(roomId);
+    }
+
+    socket.leave(roomId);
+  });
+
+  // Kick Player
+  socket.on(
+    'kick_player',
+    ({ roomId, playerId, targetPlayerId }: { roomId: string; playerId: string; targetPlayerId: string }) => {
+      const room = rooms[roomId];
+      if (!room) return;
+
+      if (room.hostId !== playerId) {
+        socket.emit('error', 'Hanya host yang bisa menendang pemain');
+        return;
+      }
+
+      if (room.status !== 'LOBBY') {
+        socket.emit('error', 'Hanya bisa menendang pemain saat di Lobby');
+        return;
+      }
+
+      const targetIndex = room.players.findIndex((p) => p.id === targetPlayerId);
+      if (targetIndex === -1) return;
+
+      const targetPlayer = room.players[targetIndex];
+      room.players.splice(targetIndex, 1);
+
+      if (targetPlayer.socketId) {
+        io.to(targetPlayer.socketId).emit('kicked');
+        const targetSocket = io.sockets.sockets.get(targetPlayer.socketId);
+        if (targetSocket) {
+          targetSocket.leave(roomId);
+        }
+      }
+
+      io.to(roomId).emit('game_alert', {
+        type: 'info',
+        message: `${targetPlayer.name} telah ditendang oleh Host.`,
+      });
+
+      broadcastRoomState(roomId);
     }
   );
 
@@ -609,22 +747,39 @@ io.on('connection', (socket: Socket) => {
         const allDisconnected = room.players.every((p) => p.socketId === null);
         if (allDisconnected) {
           clearRoomTimeout(roomId);
+          if (hostTransferTimeouts[roomId]) {
+            clearTimeout(hostTransferTimeouts[roomId]);
+            delete hostTransferTimeouts[roomId];
+          }
           // Wait 5 minutes before deleting the room in case of reconnection
           roomTimeouts[roomId] = setTimeout(() => {
             delete rooms[roomId];
             console.log(`Cleaned up empty room: ${roomId}`);
           }, 300000);
         } else {
-          // If the disconnected player was the host, reassign host
+          // If the disconnected player was the host, reassign host after delay
           if (room.hostId === player.id) {
-            const nextHost = room.players.find((p) => p.socketId !== null);
-            if (nextHost) {
-              room.hostId = nextHost.id;
-              io.to(roomId).emit('game_alert', {
-                type: 'info',
-                message: `${nextHost.name} sekarang menjadi Host Room.`,
-              });
+            if (hostTransferTimeouts[roomId]) {
+              clearTimeout(hostTransferTimeouts[roomId]);
             }
+            hostTransferTimeouts[roomId] = setTimeout(() => {
+              const r = rooms[roomId];
+              if (r && r.hostId === player.id) {
+                const hostPlayer = r.players.find((p) => p.id === player.id);
+                if (hostPlayer && hostPlayer.socketId === null) {
+                  const nextHost = r.players.find((p) => p.socketId !== null);
+                  if (nextHost) {
+                    r.hostId = nextHost.id;
+                    io.to(roomId).emit('game_alert', {
+                      type: 'info',
+                      message: `${nextHost.name} sekarang menjadi Host Room.`,
+                    });
+                    broadcastRoomState(roomId);
+                  }
+                }
+              }
+              delete hostTransferTimeouts[roomId];
+            }, 8000);
           }
         }
         
