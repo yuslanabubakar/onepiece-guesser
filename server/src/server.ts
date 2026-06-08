@@ -30,6 +30,14 @@ interface Player {
   guessTimeMs?: number | null;
 }
 
+interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
+
 interface Question {
   text: string;
   reactions: { [playerId: string]: 'ya' | 'tidak' | 'mungkin' };
@@ -52,6 +60,7 @@ interface Room {
   timerEndEpoch: number | null;
   timerDuration: number | null;
   gameStartEpoch?: number | null;
+  messages: ChatMessage[];
 }
 
 // In-memory rooms store
@@ -215,6 +224,7 @@ io.on('connection', (socket: Socket) => {
       turnPhase: 'NONE',
       timerEndEpoch: null,
       timerDuration: null,
+      messages: [],
     };
 
     socket.join(roomId);
@@ -727,6 +737,38 @@ io.on('connection', (socket: Socket) => {
       message: 'Game telah di-restart! Silakan masukkan usulan karakter baru.',
     });
   });
+
+  // Send Chat Message
+  socket.on(
+    'send_chat_message',
+    ({ roomId, playerId, text }: { roomId: string; playerId: string; text: string }) => {
+      const room = rooms[roomId];
+      if (!room) return;
+
+      const player = room.players.find((p) => p.id === playerId);
+      if (!player) return;
+
+      if (!text || text.trim() === '') return;
+
+      const chatMsg: ChatMessage = {
+        id: uuidv4(),
+        senderId: playerId,
+        senderName: player.name,
+        text: text.trim().slice(0, 200), // Limit message size to 200 chars
+        timestamp: Date.now(),
+      };
+
+      if (!room.messages) {
+        room.messages = [];
+      }
+      room.messages.push(chatMsg);
+      if (room.messages.length > 50) {
+        room.messages.shift();
+      }
+
+      io.to(roomId).emit('chat_message', chatMsg);
+    }
+  );
 
   // Disconnect
   socket.on('disconnect', () => {

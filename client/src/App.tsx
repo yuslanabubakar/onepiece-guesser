@@ -1096,10 +1096,149 @@ function GameApp() {
   return null;
 }
 
+// Chat Widget Component
+function ChatWidget() {
+  const { room, playerId, sendChatMessage } = useGame();
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatText, setChatText] = useState('');
+  const [lastReadMessageCount, setLastReadMessageCount] = useState(0);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const totalMessages = room?.messages?.length || 0;
+  const unreadCount = chatOpen ? 0 : totalMessages - lastReadMessageCount;
+
+  useEffect(() => {
+    if (chatOpen && room?.messages) {
+      setLastReadMessageCount(room.messages.length);
+    }
+  }, [room?.messages?.length, chatOpen]);
+
+  useEffect(() => {
+    if (chatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [room?.messages?.length, chatOpen]);
+
+  if (!room) return null;
+
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (chatText.trim()) {
+      sendChatMessage(chatText);
+      setChatText('');
+    }
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[1000] flex flex-col items-end">
+      {chatOpen && (
+        <div className="logbook-card w-[320px] sm:w-[360px] h-[400px] flex flex-col mb-4 shadow-2xl animate-slideUp" style={{ padding: '1rem', display: 'flex', flexDirection: 'column' }}>
+          {/* Header */}
+          <div className="flex justify-between items-center border-b border-amber-950/20 pb-2 mb-3">
+            <h3 className="heading-pirate text-sm text-left m-0 flex items-center gap-2" style={{ background: 'none', WebkitTextFillColor: 'initial' }}>
+              <span>💬</span> Live Chat Kru
+            </h3>
+            <button 
+              onClick={() => setChatOpen(false)}
+              className="p-1 rounded hover:bg-white/10 text-amber-500 font-bold text-xs border border-transparent transition-colors"
+            >
+              Tutup
+            </button>
+          </div>
+          
+          {/* Message Area */}
+          <div className="flex-grow overflow-y-auto space-y-3 pr-1 mb-2 font-serif text-xs" style={{ maxHeight: '260px' }}>
+            {room.messages && room.messages.length > 0 ? (
+              room.messages.map((msg) => {
+                const isMsgMe = msg.senderId === playerId;
+                const isMsgHost = room.hostId === msg.senderId;
+                const msgTime = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                return (
+                  <div 
+                    key={msg.id} 
+                    className={`flex flex-col ${isMsgMe ? 'items-end' : 'items-start'}`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-0.5 text-[9px] text-amber-700">
+                      {isMsgHost && <Crown className="w-2.5 h-2.5 text-amber-600" />}
+                      <span className={`font-bold ${isMsgMe ? 'text-sky-400' : isMsgHost ? 'text-amber-500' : 'text-stone-300'}`}>
+                        {msg.senderName}
+                      </span>
+                      <span>• {msgTime}</span>
+                    </div>
+                    <div className={`p-2 rounded-xl max-w-[85%] break-words leading-relaxed ${
+                      isMsgMe 
+                        ? 'bg-sky-950/40 border border-sky-800/60 text-sky-100 rounded-tr-none' 
+                        : 'bg-stone-900/60 border border-stone-800/60 text-stone-200 rounded-tl-none'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center text-stone-500 py-10 italic">
+                Belum ada pesan. Kirim pesan pertama untuk menyapa kru!
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input area */}
+          <form onSubmit={handleChatSubmit} className="flex gap-2 border-t border-amber-950/20 pt-2 mt-auto">
+            <input 
+              type="text"
+              value={chatText}
+              onChange={(e) => setChatText(e.target.value)}
+              placeholder="Ketik pesan..."
+              className="input-pirate flex-grow text-xs py-2 px-3 rounded-lg"
+              maxLength={200}
+            />
+            <button 
+              type="submit"
+              disabled={!chatText.trim()}
+              className="btn-pirate btn-pirate-gold p-2 aspect-square flex items-center justify-center rounded-lg"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Toggle Button */}
+      <button 
+        onClick={() => setChatOpen(!chatOpen)}
+        className={`p-4 rounded-full bg-slate-950/95 border border-amber-500/80 hover:border-amber-400 hover:scale-105 transition-all shadow-lg flex items-center justify-center relative ${
+          chatOpen ? 'rotate-90' : ''
+        }`}
+        title="Buka Chat Room"
+      >
+        <MessageSquare className="w-6 h-6 text-amber-400" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-bold text-[9px] w-5 h-5 rounded-full flex items-center justify-center border border-white animate-pulse">
+            {unreadCount}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
+function GameAppWrapper() {
+  const { room } = useGame();
+  return (
+    <>
+      <GameApp />
+      {room && <ChatWidget />}
+    </>
+  );
+}
+
 export default function App() {
   return (
     <GameProvider>
-      <GameApp />
+      <GameAppWrapper />
     </GameProvider>
   );
 }
+

@@ -25,6 +25,14 @@ export interface Guess {
   reactions: { [playerId: string]: 'benar' | 'salah' };
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
+
 export interface Room {
   id: string;
   hostId: string;
@@ -37,6 +45,7 @@ export interface Room {
   timerEndEpoch: number | null;
   timerDuration: number | null;
   gameStartEpoch?: number | null;
+  messages?: ChatMessage[];
 }
 
 export interface AlertMessage {
@@ -67,6 +76,7 @@ interface GameContextType {
   toggleMute: () => void;
   leaveRoom: () => void;
   kickPlayer: (targetPlayerId: string) => void;
+  sendChatMessage: (text: string) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -161,6 +171,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setRoom(null);
       setError('Anda telah ditendang dari room oleh Host');
       audioService.playWrong();
+    });
+
+    newSocket.on('chat_message', (msg: ChatMessage) => {
+      setRoom((currentRoom) => {
+        if (!currentRoom) return null;
+        const updatedMessages = currentRoom.messages ? [...currentRoom.messages, msg] : [msg];
+        if (updatedMessages.length > 50) {
+          updatedMessages.shift();
+        }
+        return {
+          ...currentRoom,
+          messages: updatedMessages,
+        };
+      });
+      // Play a click sound on new chat messages
+      audioService.playClick();
     });
 
     newSocket.on('error', (msg: string) => {
@@ -269,6 +295,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const sendChatMessage = (text: string) => {
+    if (socket && room && playerId) {
+      socket.emit('send_chat_message', { roomId: room.id, playerId, text });
+    }
+  };
+
   return (
     <GameContext.Provider
       value={{
@@ -294,6 +326,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         toggleMute,
         leaveRoom,
         kickPlayer,
+        sendChatMessage,
       }}
     >
       {children}
