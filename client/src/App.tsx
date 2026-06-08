@@ -824,12 +824,20 @@ function GameApp() {
                       <p className="text-xs text-amber-700 font-serif italic mb-2">
                         Setelah setidaknya 1 teman bereaksi, waktu 45 detik berjalan. Anda bisa menebak sekarang jika siap.
                       </p>
-                      <button 
-                        onClick={guessNow}
-                        className="btn-pirate btn-pirate-gold w-full py-3"
-                      >
-                        Menebak Sekarang (Batas waktu 15 detik)
-                      </button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          onClick={skipGuessing}
+                          className="btn-pirate py-3 text-amber-950 border-amber-900 bg-transparent font-bold"
+                        >
+                          Lewati (Skip)
+                        </button>
+                        <button 
+                          onClick={guessNow}
+                          className="btn-pirate btn-pirate-gold py-3"
+                        >
+                          Tebak Sekarang
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3 pt-2 border-t border-amber-950/20">
