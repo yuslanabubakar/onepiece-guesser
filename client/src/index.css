@@ -264,6 +264,15 @@ body {
   margin-bottom: 1rem;
 }
 
+.heading-pirate span,
+.heading-pirate svg,
+.snail-icon-container {
+  -webkit-text-fill-color: initial !important;
+  background: none !important;
+  -webkit-background-clip: border-box !important;
+}
+
+
 h2.heading-pirate {
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   -webkit-background-clip: text;

@@ -357,7 +357,7 @@ function GameApp() {
 
           <div className="logbook-card">
             <h3 className="heading-pirate text-lg text-left border-b border-amber-500/20 pb-2 mb-4 flex items-center gap-2">
-              🧭 Panduan & Aturan Bermain
+              <span>🧭</span> Panduan & Aturan Bermain
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="text-xs font-serif">
               <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
@@ -469,7 +469,7 @@ function GameApp() {
             <LogOut className="w-4 h-4" /> Keluar
           </button>
           <h1 className="heading-pirate text-2xl flex items-center gap-1 m-0">
-            🐌 Den Den Trivia
+            <span>🐌</span> Den Den Trivia
           </h1>
           <div className="relative w-8 h-8">
             {renderMuteToggle()}
@@ -573,7 +573,7 @@ function GameApp() {
             <LogOut className="w-4 h-4" /> Keluar
           </button>
           <h1 className="heading-pirate text-2xl flex items-center gap-1 m-0">
-            🐌 Den Den Trivia
+            <span>🐌</span> Den Den Trivia
           </h1>
           <div className="relative w-8 h-8">
             {renderMuteToggle()}
@@ -923,7 +923,7 @@ function GameApp() {
             {me && me.questionsHistory && me.questionsHistory.length > 0 && (
               <div className="logbook-card py-3 px-4 mb-4">
                 <h3 className="heading-pirate text-sm text-left border-b border-amber-950 pb-1 mb-2 flex items-center gap-1">
-                  📜 Riwayat Pertanyaan Anda
+                  <span>📜</span> Riwayat Pertanyaan Anda
                 </h3>
                 <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
                   {me.questionsHistory.slice().reverse().map((q, idx) => (
@@ -1019,7 +1019,7 @@ function GameApp() {
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col justify-center">
         <h1 className="heading-pirate text-3xl mb-1 flex items-center justify-center gap-1">
-          ☠️ Game Selesai!
+          <span>☠️</span> Game Selesai!
         </h1>
         <p className="text-center text-xs italic text-amber-500 mb-6 font-serif">
           Semua kru telah mendarat. Berikut hasil catatannya:
