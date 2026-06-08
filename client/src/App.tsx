@@ -273,12 +273,14 @@ function GameApp() {
   if (!room) {
     return (
       <div className="lobby-container">
-        <h1 className="heading-pirate text-4xl mb-2 flex items-center justify-center gap-2">
-          <span className="snail-icon-container">🐌</span> Den Den Trivia
-        </h1>
-        <p className="text-center text-sm italic text-amber-500 mb-8 font-serif">
-          "Panggil Mushi Transponder Anda & Tebak Karakternya!"
-        </p>
+        <div className="lobby-header-section text-center">
+          <h1 className="heading-pirate text-4xl mb-2 flex items-center justify-center gap-2">
+            <span className="snail-icon-container">🐌</span> Den Den Trivia
+          </h1>
+          <p className="text-center text-sm italic text-amber-500 mb-8 font-serif">
+            "Panggil Mushi Transponder Anda & Tebak Karakternya!"
+          </p>
+        </div>
 
         {(localError || error) && (
           <div className="alert-banner alert-danger">
@@ -296,152 +298,154 @@ function GameApp() {
           </div>
         )}
 
-        <div className="logbook-card">
-          {renderMuteToggle()}
-          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
-            <h2 className="heading-pirate text-xl text-left border-b-2 border-amber-950 pb-2">Buat atau Gabung Logbook</h2>
-            <div>
-              <label htmlFor="playerName" className="block text-sm font-bold font-serif mb-1 text-amber-950">Nama Anda</label>
-              <input
-                type="text"
-                id="playerName"
-                placeholder="Misal: Luffy, Zoro..."
-                value={inputName}
-                onChange={(e) => setInputName(e.target.value)}
-                className="input-pirate"
-              />
-            </div>
-            
-            <div className="pt-2">
+        <div className="lobby-grid">
+          <div className="logbook-card">
+            {renderMuteToggle()}
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
+              <h2 className="heading-pirate text-xl text-left border-b-2 border-amber-950 pb-2">Buat atau Gabung Logbook</h2>
+              <div>
+                <label htmlFor="playerName" className="block text-sm font-bold font-serif mb-1 text-amber-950">Nama Anda</label>
+                <input
+                  type="text"
+                  id="playerName"
+                  placeholder="Misal: Luffy, Zoro..."
+                  value={inputName}
+                  onChange={(e) => setInputName(e.target.value)}
+                  className="input-pirate"
+                />
+              </div>
+              
+              <div className="pt-2">
+                <button 
+                  type="button" 
+                  onClick={handleCreateClick}
+                  className="btn-pirate btn-pirate-gold w-full py-3"
+                >
+                  <Crown className="w-5 h-5" /> Buat Room Baru
+                </button>
+              </div>
+
+              <div className="relative flex py-5 items-center">
+                <div className="flex-grow border-t border-amber-900 opacity-30"></div>
+                <span className="flex-shrink mx-4 text-amber-950 font-serif text-sm">ATAU</span>
+                <div className="flex-grow border-t border-amber-900 opacity-30"></div>
+              </div>
+
+              <div>
+                <label htmlFor="roomId" className="block text-sm font-bold font-serif mb-1 text-amber-950">Kode Room (6 Digit)</label>
+                <input
+                  type="text"
+                  id="roomId"
+                  placeholder="Ketik Kode Room..."
+                  value={inputRoomId}
+                  onChange={(e) => setInputRoomId(e.target.value.toUpperCase())}
+                  className="input-pirate text-center tracking-widest font-mono uppercase"
+                  maxLength={6}
+                />
+              </div>
+              
               <button 
                 type="button" 
-                onClick={handleCreateClick}
-                className="btn-pirate btn-pirate-gold w-full py-3"
+                onClick={handleJoinClick}
+                className="btn-pirate w-full py-3"
+                disabled={!inputRoomId}
               >
-                <Crown className="w-5 h-5" /> Buat Room Baru
+                <Play className="w-5 h-5" /> Masuk Room
               </button>
-            </div>
+            </form>
+          </div>
 
-            <div className="relative flex py-5 items-center">
-              <div className="flex-grow border-t border-amber-900 opacity-30"></div>
-              <span className="flex-shrink mx-4 text-amber-950 font-serif text-sm">ATAU</span>
-              <div className="flex-grow border-t border-amber-900 opacity-30"></div>
-            </div>
-
-            <div>
-              <label htmlFor="roomId" className="block text-sm font-bold font-serif mb-1 text-amber-950">Kode Room (6 Digit)</label>
-              <input
-                type="text"
-                id="roomId"
-                placeholder="Ketik Kode Room..."
-                value={inputRoomId}
-                onChange={(e) => setInputRoomId(e.target.value.toUpperCase())}
-                className="input-pirate text-center tracking-widest font-mono uppercase"
-                maxLength={6}
-              />
-            </div>
-            
-            <button 
-              type="button" 
-              onClick={handleJoinClick}
-              className="btn-pirate w-full py-3"
-              disabled={!inputRoomId}
-            >
-              <Play className="w-5 h-5" /> Masuk Room
-            </button>
-          </form>
-        </div>
-
-        <div className="logbook-card mt-6">
-          <h3 className="heading-pirate text-lg text-left border-b border-amber-500/20 pb-2 mb-4 flex items-center gap-2">
-            🧭 Panduan & Aturan Bermain
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="text-xs font-serif">
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              <span style={{
-                backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                color: '#fbbf24',
-                padding: '0.25rem',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 'bold',
-                width: '24px',
-                height: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid rgba(251, 191, 36, 0.2)',
-                flexShrink: 0
-              }}>1</span>
-              <div>
-                <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Buat / Gabung Room</strong>
-                Tulis nama Anda kemudian buat room baru (sebagai Kapten/Host) atau ketik Kode Room teman Anda untuk bergabung (maksimal 7 pemain).
+          <div className="logbook-card">
+            <h3 className="heading-pirate text-lg text-left border-b border-amber-500/20 pb-2 mb-4 flex items-center gap-2">
+              🧭 Panduan & Aturan Bermain
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="text-xs font-serif">
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                <span style={{
+                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                  color: '#fbbf24',
+                  padding: '0.25rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(251, 191, 36, 0.2)',
+                  flexShrink: 0
+                }}>1</span>
+                <div>
+                  <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Buat / Gabung Room</strong>
+                  Tulis nama Anda kemudian buat room baru (sebagai Kapten/Host) atau ketik Kode Room teman Anda untuk bergabung (maksimal 7 pemain).
+                </div>
               </div>
-            </div>
-            
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              <span style={{
-                backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                color: '#fbbf24',
-                padding: '0.25rem',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 'bold',
-                width: '24px',
-                height: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid rgba(251, 191, 36, 0.2)',
-                flexShrink: 0
-              }}>2</span>
-              <div>
-                <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Usulkan Tokoh One Piece</strong>
-                Setiap pemain memasukkan 3 usulan nama karakter One Piece secara rahasia. Sistem akan otomatis mengacak dan membagikan 1 karakter unik ke tiap pemain untuk ditebak (Anda dijamin tidak akan menebak karakter usulan sendiri atau mendapatkan karakter ganda).
+              
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                <span style={{
+                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                  color: '#fbbf24',
+                  padding: '0.25rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(251, 191, 36, 0.2)',
+                  flexShrink: 0
+                }}>2</span>
+                <div>
+                  <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Usulkan Tokoh One Piece</strong>
+                  Setiap pemain memasukkan 3 usulan nama karakter One Piece secara rahasia. Sistem akan otomatis mengacak dan membagikan 1 karakter unik ke tiap pemain untuk ditebak (Anda dijamin tidak akan menebak karakter usulan sendiri atau mendapatkan karakter ganda).
+                </div>
               </div>
-            </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              <span style={{
-                backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                color: '#fbbf24',
-                padding: '0.25rem',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 'bold',
-                width: '24px',
-                height: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid rgba(251, 191, 36, 0.2)',
-                flexShrink: 0
-              }}>3</span>
-              <div>
-                <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Ajukan Pertanyaan Clue</strong>
-                Saat giliran Anda tiba, tulis pertanyaan pancingan untuk menebak siapa Anda (contoh: <em>"Apakah saya anggota Topi Jerami?"</em>). Anggota kru lain akan merespons jujur secara real-time dengan memilih: <strong>YA</strong>, <strong>TIDAK</strong>, atau <strong>MUNGKIN</strong>.
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                <span style={{
+                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                  color: '#fbbf24',
+                  padding: '0.25rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(251, 191, 36, 0.2)',
+                  flexShrink: 0
+                }}>3</span>
+                <div>
+                  <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Ajukan Pertanyaan Clue</strong>
+                  Saat giliran Anda tiba, tulis pertanyaan pancingan untuk menebak siapa Anda (contoh: <em>"Apakah saya anggota Topi Jerami?"</em>). Anggota kru lain akan merespons jujur secara real-time dengan memilih: <strong>YA</strong>, <strong>TIDAK</strong>, atau <strong>MUNGKIN</strong>.
+                </div>
               </div>
-            </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-              <span style={{
-                backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                color: '#fbbf24',
-                padding: '0.25rem',
-                borderRadius: '6px',
-                fontSize: '0.75rem',
-                fontWeight: 'bold',
-                width: '24px',
-                height: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                border: '1px solid rgba(251, 191, 36, 0.2)',
-                flexShrink: 0
-              }}>4</span>
-              <div>
-                <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Menebak dengan Nyawa (❤️)</strong>
-                Anda dapat menebak nama karakter Anda di sisa waktu giliran. Anda memiliki **3 nyawa (❤️)**. Jika tebakan Anda benar (cocok dengan karakter rahasia Anda), Anda menang secara instan! Waktu penyelesaian tercepat Anda akan dicatat di papan skor akhir.
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                <span style={{
+                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                  color: '#fbbf24',
+                  padding: '0.25rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 'bold',
+                  width: '24px',
+                  height: '24px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(251, 191, 36, 0.2)',
+                  flexShrink: 0
+                }}>4</span>
+                <div>
+                  <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Menebak dengan Nyawa (❤️)</strong>
+                  Anda dapat menebak nama karakter Anda di sisa waktu giliran. Anda memiliki **3 nyawa (❤️)**. Jika tebakan Anda benar (cocok dengan karakter rahasia Anda), Anda menang secara instan! Waktu penyelesaian tercepat Anda akan dicatat di papan skor akhir.
+                </div>
               </div>
             </div>
           </div>
