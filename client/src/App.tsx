@@ -441,7 +441,7 @@ function GameApp() {
               }}>4</span>
               <div>
                 <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Menebak dengan Nyawa (❤️)</strong>
-                Anda dapat menebak nama karakter Anda di sisa waktu giliran. Anda memiliki **3 nyawa (❤️)**. Jika tebakan Anda benar secara otomatis (atau disetujui voting kru), Anda menang! Waktu penyelesaian tercepat Anda akan dicatat di papan skor akhir.
+                Anda dapat menebak nama karakter Anda di sisa waktu giliran. Anda memiliki **3 nyawa (❤️)**. Jika tebakan Anda benar (cocok dengan karakter rahasia Anda), Anda menang secara instan! Waktu penyelesaian tercepat Anda akan dicatat di papan skor akhir.
               </div>
             </div>
           </div>
