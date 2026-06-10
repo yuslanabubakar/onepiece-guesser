@@ -2,11 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
 import { popularCharacters } from './data/characters';
 import { audioService } from './services/audio';
-import { 
-  Volume2, VolumeX, Copy, Check, Users, Crown, LogOut, 
-  Play, Send, Heart, X, Check as CheckIcon, RotateCcw, MessageSquare,
-  UserX
-} from 'lucide-react';
+import { PixelIcon } from './components/PixelIcon';
+import { Avatar } from './components/Avatar';
 import confetti from 'canvas-confetti';
 
 // Autocomplete Input Component
@@ -15,9 +12,10 @@ interface AutocompleteInputProps {
   onChange: (val: string) => void;
   placeholder: string;
   id: string;
+  ariaLabel?: string;
 }
 
-function AutocompleteInput({ value, onChange, placeholder, id }: AutocompleteInputProps) {
+function AutocompleteInput({ value, onChange, placeholder, id, ariaLabel }: AutocompleteInputProps) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -69,14 +67,20 @@ function AutocompleteInput({ value, onChange, placeholder, id }: AutocompleteInp
           }
         }}
         placeholder={placeholder}
+        aria-label={ariaLabel || placeholder}
+        role="combobox"
+        aria-expanded={showSuggestions && suggestions.length > 0}
+        aria-autocomplete="list"
         className="input-pirate w-full"
         autoComplete="off"
       />
       {showSuggestions && suggestions.length > 0 && (
-        <div className="autocomplete-dropdown">
+        <div className="autocomplete-dropdown" role="listbox">
           {suggestions.map((name) => (
             <div
               key={name}
+              role="option"
+              aria-selected={value === name}
               onClick={() => selectSuggestion(name)}
               className="autocomplete-item"
             >
@@ -137,7 +141,7 @@ function TimerCountdown({ expiryEpoch }: { expiryEpoch: number | null }) {
 // Inner Game App
 function GameApp() {
   const {
-    room, playerId, playerName, error, alert, isMuted,
+    room, playerId, playerName, error, alert, isMuted, connected,
     clearError, clearAlert, createRoom, joinRoom, submitSuggestions,
     submitQuestion, submitQuestionReaction, skipGuessing, guessNow, submitGuess,
     startGame, restartGame, toggleMute, leaveRoom, kickPlayer
@@ -263,9 +267,11 @@ function GameApp() {
     <button 
       onClick={toggleMute}
       className="absolute top-2 right-2 p-2 rounded-md bg-op-yellow hover:bg-op-white text-op-brown border-2 border-op-brown transition-colors z-50"
-      title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
+      title={isMuted ? 'Bunyikan suara' : 'Bisukan suara'}
+      aria-label={isMuted ? 'Bunyikan suara' : 'Bisukan suara'}
+      aria-pressed={isMuted}
     >
-      {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5 animate-pulse" />}
+      {isMuted ? <PixelIcon name="volume-off" className="w-5 h-5" /> : <PixelIcon name="volume-on" className="w-5 h-5 animate-pulse" />}
     </button>
   );
 
@@ -275,16 +281,26 @@ function GameApp() {
       <div className="lobby-container">
         <div className="lobby-header-section text-center">
           <h1 className="game-title text-xl sm:text-3xl mb-3 flex flex-wrap items-center justify-center gap-2 leading-relaxed">
-            <span className="snail-icon-container">🐌</span> Den Den Trivia
+            <span className="snail-icon-container"><PixelIcon name="snail" className="w-7 h-7 sm:w-9 sm:h-9" /></span> Den Den Trivia
           </h1>
-          <p className="text-center text-xs sm:text-sm italic text-op-yellow/90 mb-8">
+          <p className="text-center text-xs sm:text-sm italic text-op-yellow/90 mb-4">
             "Panggil Mushi Transponder Anda &amp; Tebak Karakternya!"
           </p>
+          <div className="flex justify-center mb-6" aria-live="polite">
+            <span className={`inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-md border-2 ${
+              connected
+                ? 'bg-op-navy/60 border-op-yellow text-op-yellow'
+                : 'bg-op-red/20 border-op-red text-op-white'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${connected ? 'bg-[#2f9e44]' : 'bg-op-red animate-pulse'}`}></span>
+              {connected ? 'Terhubung ke server' : 'Menyambung ke server...'}
+            </span>
+          </div>
         </div>
 
         {(localError || error) && (
-          <div className="alert-banner alert-danger">
-            <X className="w-5 h-5 flex-shrink-0" />
+          <div className="alert-banner alert-danger" role="alert">
+            <PixelIcon name="close" className="w-5 h-5" />
             <span className="text-sm">{localError || error}</span>
             <button 
               onClick={() => {
@@ -292,6 +308,7 @@ function GameApp() {
                 clearError();
               }} 
               className="ml-auto text-current font-bold"
+              aria-label="Tutup notifikasi"
             >
               &times;
             </button>
@@ -320,8 +337,9 @@ function GameApp() {
                   type="button" 
                   onClick={handleCreateClick}
                   className="btn-pirate btn-pirate-gold w-full py-3"
+                  disabled={!connected}
                 >
-                  <Crown className="w-5 h-5" /> Buat Room Baru
+                  <PixelIcon name="crown" className="w-5 h-5" /> Buat Room Baru
                 </button>
               </div>
 
@@ -348,16 +366,16 @@ function GameApp() {
                 type="button" 
                 onClick={handleJoinClick}
                 className="btn-pirate w-full py-3"
-                disabled={!inputRoomId}
+                disabled={!inputRoomId || !connected}
               >
-                <Play className="w-5 h-5" /> Masuk Room
+                <PixelIcon name="play" className="w-5 h-5" /> Masuk Room
               </button>
             </form>
           </div>
 
           <div className="logbook-card">
             <h3 className="heading-pirate text-sm text-left border-b-2 border-op-brown/30 pb-3 mb-4 flex items-center gap-2">
-              <span>🧭</span> Panduan &amp; Aturan Bermain
+              <PixelIcon name="book-open" className="w-4 h-4" /> Panduan &amp; Aturan Bermain
             </h3>
             <div className="flex flex-col gap-4 text-sm leading-relaxed">
               {[
@@ -374,7 +392,7 @@ function GameApp() {
                   body: 'Saat giliran Anda, tulis pertanyaan pancingan untuk menebak siapa Anda. Kru lain merespons jujur secara real-time: YA, TIDAK, atau MUNGKIN.',
                 },
                 {
-                  title: 'Menebak dengan Nyawa (❤️)',
+                  title: 'Menebak dengan Nyawa',
                   body: 'Tebak karakter Anda di sisa waktu giliran. Anda punya 3 nyawa. Tebakan benar = menang instan! Waktu tercepat Anda dicatat di papan skor akhir.',
                 },
               ].map((step, idx) => (
@@ -383,7 +401,10 @@ function GameApp() {
                     {idx + 1}
                   </span>
                   <div className="text-op-brown/90">
-                    <strong className="block mb-1 text-op-brown">{step.title}</strong>
+                    <strong className="flex items-center gap-1.5 mb-1 text-op-brown">
+                      {step.title}
+                      {idx === 3 && <PixelIcon name="heart" className="w-3.5 h-3.5 text-op-red" title="Nyawa" />}
+                    </strong>
                     {step.body}
                   </div>
                 </div>
@@ -406,11 +427,11 @@ function GameApp() {
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col">
         <div className="flex justify-between items-center mb-6 gap-3">
-          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2">
-            <LogOut className="w-4 h-4" /> Keluar
+          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2" aria-label="Keluar dari room">
+            <PixelIcon name="logout" className="w-4 h-4" /> Keluar
           </button>
           <h1 className="game-title text-base sm:text-xl flex items-center gap-1 m-0">
-            <span>🐌</span> Den Den Trivia
+            <span className="snail-icon-container"><PixelIcon name="snail" className="w-5 h-5 sm:w-6 sm:h-6" /></span> Den Den Trivia
           </h1>
           <div className="relative w-8 h-8">
             {renderMuteToggle()}
@@ -418,10 +439,10 @@ function GameApp() {
         </div>
 
         {error && (
-          <div className="alert-banner alert-danger">
-            <X className="w-5 h-5 flex-shrink-0" />
+          <div className="alert-banner alert-danger" role="alert">
+            <PixelIcon name="close" className="w-5 h-5" />
             <span className="text-sm">{error}</span>
-            <button onClick={clearError} className="ml-auto text-current font-bold">&times;</button>
+            <button onClick={clearError} className="ml-auto text-current font-bold" aria-label="Tutup notifikasi">&times;</button>
           </div>
         )}
 
@@ -431,7 +452,7 @@ function GameApp() {
           
           <div className="share-buttons-group">
             <button onClick={handleCopyLink} className="btn-share btn-share-copy">
-              {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+              {copied ? <PixelIcon name="check" className="w-4 h-4" /> : <PixelIcon name="copy" className="w-4 h-4" />}
               {copied ? 'Tersalin!' : 'Salin Link'}
             </button>
             
@@ -456,13 +477,14 @@ function GameApp() {
 
         <div className="logbook-card flex-grow mb-6">
           <h3 className="heading-pirate text-lg text-left border-b border-amber-950 pb-1 mb-3 flex items-center gap-2">
-            <Users className="w-5 h-5" /> Daftar Kru ({room.players.length}/7)
+            <PixelIcon name="users" className="w-5 h-5" /> Daftar Kru ({room.players.length}/7)
           </h3>
           <div className="space-y-2">
             {room.players.map((p) => (
               <div key={p.id} className="player-row">
                 <span className="flex items-center gap-2 font-semibold">
-                  {room.hostId === p.id && <Crown className="w-4 h-4 text-amber-600" />}
+                  <Avatar id={p.id} name={p.name} size={28} />
+                  {room.hostId === p.id && <PixelIcon name="crown" className="w-4 h-4 text-amber-600" title="Kapten / Host" />}
                   {p.name} {p.id === playerId ? '(Anda)' : ''}
                 </span>
                 <div className="flex items-center gap-2">
@@ -474,8 +496,9 @@ function GameApp() {
                       onClick={() => kickPlayer(p.id)}
                       className="p-1 rounded bg-red-950/40 text-red-400 hover:bg-red-900/40 hover:text-red-200 border border-red-800 transition-colors flex items-center justify-center"
                       title="Tendang Pemain"
+                      aria-label={`Tendang ${p.name} dari room`}
                     >
-                      <UserX className="w-4 h-4" />
+                      <PixelIcon name="user-x" className="w-4 h-4" />
                     </button>
                   )}
                 </div>
@@ -491,7 +514,7 @@ function GameApp() {
               className="btn-pirate btn-pirate-gold w-full py-4 text-lg"
               disabled={room.players.length < 2}
             >
-              <Play className="w-6 h-6" /> Mulai Petualangan!
+              <PixelIcon name="play" className="w-6 h-6" /> Mulai Petualangan!
             </button>
           ) : (
             <div className="text-center text-op-yellow animate-pulse bg-op-navy/70 p-4 rounded-lg border-2 border-op-yellow">
@@ -510,11 +533,11 @@ function GameApp() {
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col">
         <div className="flex justify-between items-center mb-6 gap-3">
-          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2">
-            <LogOut className="w-4 h-4" /> Keluar
+          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2" aria-label="Keluar dari room">
+            <PixelIcon name="logout" className="w-4 h-4" /> Keluar
           </button>
           <h1 className="game-title text-base sm:text-xl flex items-center gap-1 m-0">
-            <span>🐌</span> Den Den Trivia
+            <span className="snail-icon-container"><PixelIcon name="snail" className="w-5 h-5 sm:w-6 sm:h-6" /></span> Den Den Trivia
           </h1>
           <div className="relative w-8 h-8">
             {renderMuteToggle()}
@@ -522,10 +545,10 @@ function GameApp() {
         </div>
 
         {error && (
-          <div className="alert-banner alert-danger">
-            <X className="w-5 h-5 flex-shrink-0" />
+          <div className="alert-banner alert-danger" role="alert">
+            <PixelIcon name="close" className="w-5 h-5" />
             <span className="text-sm">{error}</span>
-            <button onClick={clearError} className="ml-auto text-current font-bold">&times;</button>
+            <button onClick={clearError} className="ml-auto text-current font-bold" aria-label="Tutup notifikasi">&times;</button>
           </div>
         )}
 
@@ -539,7 +562,7 @@ function GameApp() {
               {hasSubmitted ? (
                 <div className="text-center py-6 font-serif">
                   <div className="text-green-800 font-bold text-lg mb-2 flex items-center justify-center gap-2">
-                    <CheckIcon className="w-6 h-6" /> Usulan Diterima!
+                    <PixelIcon name="check" className="w-6 h-6" /> Usulan Diterima!
                   </div>
                   <p className="text-sm text-amber-950">
                     Usulan Anda:
@@ -568,6 +591,7 @@ function GameApp() {
                       value={sug1}
                       onChange={setSug1}
                       placeholder="Misal: Luffy, Zoro..."
+                      ariaLabel="Usulan karakter 1"
                     />
                   </div>
 
@@ -578,6 +602,7 @@ function GameApp() {
                       value={sug2}
                       onChange={setSug2}
                       placeholder="Misal: Nami, Usopp..."
+                      ariaLabel="Usulan karakter 2 (opsional)"
                     />
                   </div>
 
@@ -588,6 +613,7 @@ function GameApp() {
                       value={sug3}
                       onChange={setSug3}
                       placeholder="Misal: Sanji, Robin..."
+                      ariaLabel="Usulan karakter 3 (opsional)"
                     />
                   </div>
 
@@ -597,7 +623,7 @@ function GameApp() {
                       onClick={handleRandomizeSuggestions}
                       className="btn-pirate py-3 bg-transparent border-amber-900 text-amber-950 font-bold"
                     >
-                      🎲 Acak Karakter
+                      <PixelIcon name="shuffle" className="w-4 h-4" /> Acak Karakter
                     </button>
                     <button 
                       type="submit" 
@@ -622,12 +648,15 @@ function GameApp() {
                   return (
                     <div 
                       key={p.id} 
-                      className={`p-2 rounded border flex items-center justify-between font-serif ${
+                      className={`p-2 rounded border flex items-center justify-between gap-1 font-serif ${
                         submitted ? 'bg-green-100 border-green-800 text-green-900' : 'bg-amber-50 border-amber-800 text-amber-900'
                       }`}
                     >
-                      <span className="truncate">{p.name}</span>
-                      <span>{submitted ? '✔' : '✍'}</span>
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <Avatar id={p.id} name={p.name} size={22} />
+                        <span className="truncate">{p.name}</span>
+                      </span>
+                      <span>{submitted ? <PixelIcon name="check" className="w-4 h-4" title="Sudah mengirim usulan" /> : <PixelIcon name="pen" className="w-4 h-4" title="Belum mengirim usulan" />}</span>
                     </div>
                   );
                 })}
@@ -650,16 +679,16 @@ function GameApp() {
       <div className="px-4 py-6 min-h-screen flex flex-col">
         {/* Global Toast Alert */}
         {alert && (
-          <div className={`alert-banner alert-${alert.type}`}>
-            <MessageSquare className="w-5 h-5 flex-shrink-0" />
+          <div className={`alert-banner alert-${alert.type}`} role="alert" aria-live="assertive">
+            <PixelIcon name="message" className="w-5 h-5" />
             <span className="text-xs font-serif font-bold">{alert.message}</span>
-            <button onClick={clearAlert} className="ml-auto text-current font-bold">&times;</button>
+            <button onClick={clearAlert} className="ml-auto text-current font-bold" aria-label="Tutup notifikasi">&times;</button>
           </div>
         )}
 
         <div className="flex justify-between items-center mb-4">
-          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-2 py-1 text-xs">
-            <LogOut className="w-3.5 h-3.5" /> Keluar
+          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-2 py-1 text-xs" aria-label="Keluar dari room">
+            <PixelIcon name="logout" className="w-3.5 h-3.5" /> Keluar
           </button>
           
           <div className="wanted-poster py-1 px-4 border-2 rounded">
@@ -714,16 +743,17 @@ function GameApp() {
                         value={questionText}
                         onChange={(e) => setQuestionText(e.target.value)}
                         placeholder="Misal: Apakah dia kru bajak laut topi jerami?"
+                        aria-label="Tulis pertanyaan pancingan"
                         className="input-pirate"
                         required
                       />
                       <button type="submit" className="btn-pirate btn-pirate-gold w-full py-3">
-                        <Send className="w-4 h-4" /> Kirim Pertanyaan ke Room
+                        <PixelIcon name="send" className="w-4 h-4" /> Kirim Pertanyaan ke Room
                       </button>
                     </form>
                   ) : (
                     <div className="py-6 font-serif">
-                      <div className="snail-icon-container text-4xl mb-2">🐌</div>
+                      <div className="snail-icon-container flex justify-center mb-2"><PixelIcon name="snail" className="w-12 h-12 text-op-brown" /></div>
                       <p className="text-sm font-semibold text-amber-950">
                         Menunggu {activePlayer?.name} menuliskan pertanyaan pancingan...
                       </p>
@@ -795,18 +825,21 @@ function GameApp() {
                       <div className="grid grid-cols-3 gap-2">
                         <button 
                           onClick={() => submitQuestionReaction('ya')}
+                          aria-pressed={room.activeQuestion.reactions[playerId!] === 'ya'}
                           className={`btn-pirate py-2 text-sm ${room.activeQuestion.reactions[playerId!] === 'ya' ? 'bg-emerald-950 border-emerald-500 text-emerald-100' : ''}`}
                         >
                           Ya
                         </button>
                         <button 
                           onClick={() => submitQuestionReaction('tidak')}
+                          aria-pressed={room.activeQuestion.reactions[playerId!] === 'tidak'}
                           className={`btn-pirate py-2 text-sm ${room.activeQuestion.reactions[playerId!] === 'tidak' ? 'bg-red-950 border-red-500 text-red-100' : ''}`}
                         >
                           Tidak
                         </button>
                         <button 
                           onClick={() => submitQuestionReaction('mungkin')}
+                          aria-pressed={room.activeQuestion.reactions[playerId!] === 'mungkin'}
                           className={`btn-pirate py-2 text-sm ${room.activeQuestion.reactions[playerId!] === 'mungkin' ? 'bg-amber-950 border-amber-500 text-amber-100' : ''}`}
                         >
                           Mungkin
@@ -833,6 +866,7 @@ function GameApp() {
                         value={guessName}
                         onChange={setGuessName}
                         placeholder="Ketik tebakan nama karakter..."
+                        ariaLabel="Tebakan nama karakter"
                       />
                       <div className="grid grid-cols-2 gap-2 pt-2">
                         <button 
@@ -853,7 +887,7 @@ function GameApp() {
                     </form>
                   ) : (
                     <div className="py-6 font-serif">
-                      <div className="animate-pulse text-4xl mb-2">🤔</div>
+                      <div className="animate-pulse flex justify-center mb-2"><PixelIcon name="clock" className="w-12 h-12 text-op-brown" /></div>
                       <p className="text-sm font-semibold text-amber-950">
                         Menunggu {activePlayer?.name} memasukkan nama tebakan karakternya...
                       </p>
@@ -872,7 +906,7 @@ function GameApp() {
             {me && me.questionsHistory && me.questionsHistory.length > 0 && (
               <div className="logbook-card py-3 px-4 mb-4">
                 <h3 className="heading-pirate text-sm text-left border-b border-amber-950 pb-1 mb-2 flex items-center gap-1">
-                  <span>📜</span> Riwayat Pertanyaan Anda
+                  <PixelIcon name="scroll" className="w-4 h-4" /> Riwayat Pertanyaan Anda
                 </h3>
                 <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
                   {me.questionsHistory.slice().reverse().map((q, idx) => (
@@ -898,7 +932,7 @@ function GameApp() {
             {/* Players Status Deck */}
             <div className="logbook-card">
               <h3 className="heading-pirate text-sm text-left border-b border-amber-950 pb-1 mb-3 flex items-center gap-1">
-                <Users className="w-4 h-4" /> Status Kru Kapal
+                <PixelIcon name="users" className="w-4 h-4" /> Status Kru Kapal
               </h3>
               <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
                 {room.players.map((p) => {
@@ -911,8 +945,9 @@ function GameApp() {
                   for (let i = 0; i < 3; i++) {
                     const isActiveHeart = i < remaining;
                     hearts.push(
-                      <Heart 
+                      <PixelIcon 
                         key={i} 
+                        name="heart"
                         className={`heart-icon ${isActiveHeart ? 'active' : 'used'}`} 
                       />
                     );
@@ -925,13 +960,16 @@ function GameApp() {
                         isActive ? 'active' : ''
                       } ${p.hasGuessedCorrectly ? 'correct border-green-700 bg-green-50/50' : ''} ${p.failedToGuess ? 'failed border-red-700 bg-red-50/50' : ''}`}
                     >
-                      <div className="flex flex-col font-serif font-semibold truncate max-w-[160px]">
-                        <div className="flex items-center gap-1">
-                          {room.hostId === p.id && <Crown className="w-3 h-3 text-amber-600 flex-shrink-0" />}
-                          <span className="truncate">{p.name} {isPMe ? '(Anda)' : ''}</span>
-                        </div>
-                        <div className="text-[10px] text-amber-800 font-normal italic mt-0.5 leading-none">
-                          Tebak: {isPMe ? '???' : p.assignedCharacter}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar id={p.id} name={p.name} size={30} />
+                        <div className="flex flex-col font-serif font-semibold truncate max-w-[130px]">
+                          <div className="flex items-center gap-1">
+                            {room.hostId === p.id && <PixelIcon name="crown" className="w-3 h-3 text-amber-600 flex-shrink-0" title="Kapten / Host" />}
+                            <span className="truncate">{p.name} {isPMe ? '(Anda)' : ''}</span>
+                          </div>
+                          <div className="text-[10px] text-amber-800 font-normal italic mt-0.5 leading-none">
+                            Tebak: {isPMe ? '???' : p.assignedCharacter}
+                          </div>
                         </div>
                       </div>
                       
@@ -939,9 +977,9 @@ function GameApp() {
                         <div className="flex items-center gap-0.5">
                           {hearts}
                         </div>
-                        <span className="font-bold min-w-[50px] text-right">
-                          {p.hasGuessedCorrectly && <span className="text-green-700">✔ LOLOS</span>}
-                          {p.failedToGuess && <span className="text-red-700">💀 GAGAL</span>}
+                        <span className="font-bold min-w-[50px] text-right flex items-center justify-end gap-1">
+                          {p.hasGuessedCorrectly && <span className="text-green-700 flex items-center gap-1"><PixelIcon name="check" className="w-3.5 h-3.5" /> LOLOS</span>}
+                          {p.failedToGuess && <span className="text-red-700 flex items-center gap-1"><PixelIcon name="skull" className="w-3.5 h-3.5" /> GAGAL</span>}
                           {!p.hasGuessedCorrectly && !p.failedToGuess && <span className="text-amber-800">MAIN</span>}
                         </span>
                       </div>
@@ -968,7 +1006,7 @@ function GameApp() {
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col justify-center">
         <h1 className="game-title text-xl sm:text-2xl mb-2 flex items-center justify-center gap-2 leading-relaxed">
-          <span>☠️</span> Game Selesai!
+          <PixelIcon name="skull" className="w-6 h-6 sm:w-7 sm:h-7" /> Game Selesai!
         </h1>
         <p className="text-center text-xs italic text-op-yellow/90 mb-6">
           Semua kru telah mendarat. Berikut hasil catatannya:
@@ -992,11 +1030,16 @@ function GameApp() {
                     }`}
                   >
                     <div className="flex justify-between items-center font-bold">
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-2">
+                        <Avatar id={p.id} name={p.name} size={28} />
                         {p.id === playerId ? '(Anda) ' : ''}
                         {p.name}
                       </span>
-                      <span>{p.hasGuessedCorrectly ? '✔ BERHASIL' : '💀 GAGAL'}</span>
+                      <span className="flex items-center gap-1">
+                        {p.hasGuessedCorrectly
+                          ? <><PixelIcon name="check" className="w-4 h-4" /> BERHASIL</>
+                          : <><PixelIcon name="skull" className="w-4 h-4" /> GAGAL</>}
+                      </span>
                     </div>
                     <div className="text-xs mt-1 text-stone-700 flex flex-wrap justify-between gap-2">
                       <span>Karakter: <strong className="text-stone-900">{p.assignedCharacter}</strong></span>
@@ -1016,7 +1059,7 @@ function GameApp() {
               <h3 className="heading-pirate text-lg text-left border-b border-amber-950 pb-1 mb-3">Tindakan Room</h3>
               {isHost ? (
                 <button onClick={restartGame} className="btn-pirate btn-pirate-gold w-full py-4 text-lg">
-                  <RotateCcw className="w-5 h-5" /> Main Lagi!
+                  <PixelIcon name="reload" className="w-5 h-5" /> Main Lagi!
                 </button>
               ) : (
                 <div className="text-center font-serif text-amber-800 bg-amber-100/40 p-4 rounded-lg border border-amber-950/20">
@@ -1025,7 +1068,7 @@ function GameApp() {
               )}
               
               <button onClick={leaveRoom} className="btn-pirate btn-pirate-red w-full py-3">
-                <LogOut className="w-4 h-4" /> Kembali ke Menu Utama
+                <PixelIcon name="logout" className="w-4 h-4" /> Kembali ke Menu Utama
               </button>
             </div>
           </div>
@@ -1039,7 +1082,7 @@ function GameApp() {
 
 // Chat Widget Component
 function ChatWidget() {
-  const { room, playerId, sendChatMessage } = useGame();
+  const { room, playerId, connected, sendChatMessage } = useGame();
   const [chatOpen, setChatOpen] = useState(false);
   const [chatText, setChatText] = useState('');
   const [lastReadMessageCount, setLastReadMessageCount] = useState(0);
@@ -1077,7 +1120,7 @@ function ChatWidget() {
           {/* Header */}
           <div className="flex justify-between items-center border-b border-amber-950/20 pb-2 mb-3">
             <h3 className="heading-pirate text-sm text-left m-0 flex items-center gap-2" style={{ background: 'none', WebkitTextFillColor: 'initial' }}>
-              <span>💬</span> Live Chat Kru
+              <PixelIcon name="comment" className="w-4 h-4" /> Live Chat Kru
             </h3>
             <button 
               onClick={() => setChatOpen(false)}
@@ -1101,7 +1144,7 @@ function ChatWidget() {
                     className={`flex flex-col ${isMsgMe ? 'items-end' : 'items-start'}`}
                   >
                     <div className="flex items-center gap-1.5 mb-0.5 text-[9px] text-op-brown/60">
-                      {isMsgHost && <Crown className="w-2.5 h-2.5 text-op-red" />}
+                      {isMsgHost && <PixelIcon name="crown" className="w-2.5 h-2.5 text-op-red" title="Host" />}
                       <span className={`font-bold ${isMsgMe ? 'text-op-blue' : isMsgHost ? 'text-op-red' : 'text-op-brown'}`}>
                         {msg.senderName}
                       </span>
@@ -1131,16 +1174,19 @@ function ChatWidget() {
               type="text"
               value={chatText}
               onChange={(e) => setChatText(e.target.value)}
-              placeholder="Ketik pesan..."
+              placeholder={connected ? 'Ketik pesan...' : 'Menyambung ke server...'}
               className="input-pirate flex-grow text-xs py-2 px-3 rounded-lg"
               maxLength={200}
+              disabled={!connected}
+              aria-label="Ketik pesan chat"
             />
             <button 
               type="submit"
-              disabled={!chatText.trim()}
+              disabled={!chatText.trim() || !connected}
               className="btn-pirate btn-pirate-gold p-2 aspect-square flex items-center justify-center rounded-lg"
+              aria-label="Kirim pesan"
             >
-              <Send className="w-4 h-4" />
+              <PixelIcon name="send" className="w-4 h-4" />
             </button>
           </form>
         </div>
@@ -1152,9 +1198,11 @@ function ChatWidget() {
         className={`p-4 rounded-full bg-op-navy border-[3px] border-op-yellow hover:border-op-white hover:scale-105 transition-all shadow-lg flex items-center justify-center relative ${
           chatOpen ? 'rotate-90' : ''
         }`}
-        title="Buka Chat Room"
+        title={chatOpen ? 'Tutup Chat Room' : 'Buka Chat Room'}
+        aria-label={chatOpen ? 'Tutup chat room' : `Buka chat room${unreadCount > 0 ? `, ${unreadCount} pesan belum dibaca` : ''}`}
+        aria-expanded={chatOpen}
       >
-        <MessageSquare className="w-6 h-6 text-op-yellow" />
+        <PixelIcon name="message" className="w-6 h-6 text-op-yellow" />
         {unreadCount > 0 && (
           <span className="absolute -top-1.5 -right-1.5 bg-op-red text-op-white font-bold text-[9px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-op-white animate-pulse">
             {unreadCount}

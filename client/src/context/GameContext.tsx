@@ -61,6 +61,7 @@ interface GameContextType {
   error: string | null;
   alert: AlertMessage | null;
   isMuted: boolean;
+  connected: boolean;
   clearError: () => void;
   clearAlert: () => void;
   createRoom: (name: string) => void;
@@ -89,13 +90,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<AlertMessage | null>(null);
   const [isMuted, setIsMuted] = useState<boolean>(localStorage.getItem('denden_muted') === 'true');
+  const [connected, setConnected] = useState<boolean>(false);
 
   // Initialize socket
   useEffect(() => {
     // Connect to VITE_WS_URL if set (production), otherwise fallback to local hostname port 3001
     const socketUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
     const newSocket = io(socketUrl, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
       autoConnect: true,
     });
 
@@ -103,12 +105,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('connect', () => {
       console.log('Connected to server');
+      setConnected(true);
       // If we have saved credentials, try to reconnect
       const savedRoomId = localStorage.getItem('denden_roomId');
       const savedPlayerId = localStorage.getItem('denden_playerId');
       if (savedRoomId && savedPlayerId) {
         newSocket.emit('reconnect_player', { roomId: savedRoomId, playerId: savedPlayerId });
       }
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from server');
+      setConnected(false);
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.warn('Socket connection error:', err.message);
+      setConnected(false);
     });
 
     newSocket.on('room_created', ({ roomId, playerId: newPlayerId, roomState }) => {
@@ -214,18 +227,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const clearAlert = () => setAlert(null);
 
   const createRoom = (name: string) => {
-    if (socket) {
+    if (socket && socket.connected) {
       localStorage.setItem('denden_playerName', name);
       setPlayerName(name);
       socket.emit('create_room', { playerName: name });
+    } else {
+      setError('Belum terhubung ke server. Pastikan server berjalan, lalu coba lagi.');
+      audioService.playWrong();
     }
   };
 
   const joinRoom = (roomId: string, name: string) => {
-    if (socket) {
+    if (socket && socket.connected) {
       localStorage.setItem('denden_playerName', name);
       setPlayerName(name);
       socket.emit('join_room', { roomId, playerName: name, playerId });
+    } else {
+      setError('Belum terhubung ke server. Pastikan server berjalan, lalu coba lagi.');
+      audioService.playWrong();
     }
   };
 
@@ -296,8 +315,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   };
 
   const sendChatMessage = (text: string) => {
-    if (socket && room && playerId) {
+    if (socket && socket.connected && room && playerId) {
       socket.emit('send_chat_message', { roomId: room.id, playerId, text });
+    } else {
+      setError('Belum terhubung ke server. Pesan tidak terkirim.');
     }
   };
 
@@ -311,6 +332,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         error,
         alert,
         isMuted,
+        connected,
         clearError,
         clearAlert,
         createRoom,

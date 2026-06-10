@@ -61,6 +61,50 @@
   box-sizing: border-box;
 }
 
+/* Keyboard focus visibility (accessibility) */
+:focus-visible {
+  outline: 3px solid var(--op-sky);
+  outline-offset: 2px;
+}
+
+/* ----------------------------------------------------------------------------
+   Pixel icons (pixelarticons) — inherit text color, sized by wrapper
+   ---------------------------------------------------------------------------- */
+.pixel-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  line-height: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.pixel-icon > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Keep the chunky pixel edges crisp even when scaled */
+  image-rendering: pixelated;
+}
+
+/* ----------------------------------------------------------------------------
+   Crew avatar badge — retro pixel square
+   ---------------------------------------------------------------------------- */
+.crew-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-pirate);
+  font-weight: 400;
+  border: 2px solid var(--op-brown);
+  border-radius: 6px;
+  box-shadow: 2px 2px 0 0 rgba(65, 42, 30, 0.4);
+  flex-shrink: 0;
+  line-height: 1;
+  user-select: none;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -265,11 +309,6 @@ body {
   line-height: 1.6;
   text-align: center;
   margin: 0.75rem 0;
-}
-.heading-pirate span,
-.heading-pirate svg,
-.snail-icon-container {
-  color: initial;
 }
 h2.heading-pirate { color: var(--op-red); }
 
