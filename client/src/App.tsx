@@ -262,7 +262,7 @@ function GameApp() {
   const renderMuteToggle = () => (
     <button 
       onClick={toggleMute}
-      className="absolute top-4 right-4 p-2 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-800 transition-colors z-50"
+      className="absolute top-2 right-2 p-2 rounded-md bg-op-yellow hover:bg-op-white text-op-brown border-2 border-op-brown transition-colors z-50"
       title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
     >
       {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5 animate-pulse" />}
@@ -274,11 +274,11 @@ function GameApp() {
     return (
       <div className="lobby-container">
         <div className="lobby-header-section text-center">
-          <h1 className="heading-pirate text-4xl mb-2 flex items-center justify-center gap-2">
+          <h1 className="game-title text-xl sm:text-3xl mb-3 flex flex-wrap items-center justify-center gap-2 leading-relaxed">
             <span className="snail-icon-container">🐌</span> Den Den Trivia
           </h1>
-          <p className="text-center text-sm italic text-amber-500 mb-8 font-serif">
-            "Panggil Mushi Transponder Anda & Tebak Karakternya!"
+          <p className="text-center text-xs sm:text-sm italic text-op-yellow/90 mb-8">
+            "Panggil Mushi Transponder Anda &amp; Tebak Karakternya!"
           </p>
         </div>
 
@@ -356,97 +356,38 @@ function GameApp() {
           </div>
 
           <div className="logbook-card">
-            <h3 className="heading-pirate text-lg text-left border-b border-amber-500/20 pb-2 mb-4 flex items-center gap-2">
-              <span>🧭</span> Panduan & Aturan Bermain
+            <h3 className="heading-pirate text-sm text-left border-b-2 border-op-brown/30 pb-3 mb-4 flex items-center gap-2">
+              <span>🧭</span> Panduan &amp; Aturan Bermain
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }} className="text-xs font-serif">
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <span style={{
-                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                  color: '#fbbf24',
-                  padding: '0.25rem',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid rgba(251, 191, 36, 0.2)',
-                  flexShrink: 0
-                }}>1</span>
-                <div>
-                  <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Buat / Gabung Room</strong>
-                  Tulis nama Anda kemudian buat room baru (sebagai Kapten/Host) atau ketik Kode Room teman Anda untuk bergabung (maksimal 7 pemain).
+            <div className="flex flex-col gap-4 text-sm leading-relaxed">
+              {[
+                {
+                  title: 'Buat / Gabung Room',
+                  body: 'Tulis nama Anda kemudian buat room baru (sebagai Kapten/Host) atau ketik Kode Room teman Anda untuk bergabung (maksimal 7 pemain).',
+                },
+                {
+                  title: 'Usulkan Tokoh One Piece',
+                  body: 'Setiap pemain memasukkan hingga 3 usulan nama karakter One Piece secara rahasia. Sistem akan mengacak dan membagikan 1 karakter unik ke tiap pemain (dijamin bukan usulan sendiri dan tidak ada yang ganda).',
+                },
+                {
+                  title: 'Ajukan Pertanyaan Clue',
+                  body: 'Saat giliran Anda, tulis pertanyaan pancingan untuk menebak siapa Anda. Kru lain merespons jujur secara real-time: YA, TIDAK, atau MUNGKIN.',
+                },
+                {
+                  title: 'Menebak dengan Nyawa (❤️)',
+                  body: 'Tebak karakter Anda di sisa waktu giliran. Anda punya 3 nyawa. Tebakan benar = menang instan! Waktu tercepat Anda dicatat di papan skor akhir.',
+                },
+              ].map((step, idx) => (
+                <div key={idx} className="flex gap-3 items-start">
+                  <span className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md bg-op-red text-op-white border-2 border-op-brown font-bold text-xs">
+                    {idx + 1}
+                  </span>
+                  <div className="text-op-brown/90">
+                    <strong className="block mb-1 text-op-brown">{step.title}</strong>
+                    {step.body}
+                  </div>
                 </div>
-              </div>
-              
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <span style={{
-                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                  color: '#fbbf24',
-                  padding: '0.25rem',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid rgba(251, 191, 36, 0.2)',
-                  flexShrink: 0
-                }}>2</span>
-                <div>
-                  <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Usulkan Tokoh One Piece</strong>
-                  Setiap pemain memasukkan 3 usulan nama karakter One Piece secara rahasia. Sistem akan otomatis mengacak dan membagikan 1 karakter unik ke tiap pemain untuk ditebak (Anda dijamin tidak akan menebak karakter usulan sendiri atau mendapatkan karakter ganda).
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <span style={{
-                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                  color: '#fbbf24',
-                  padding: '0.25rem',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid rgba(251, 191, 36, 0.2)',
-                  flexShrink: 0
-                }}>3</span>
-                <div>
-                  <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Ajukan Pertanyaan Clue</strong>
-                  Saat giliran Anda tiba, tulis pertanyaan pancingan untuk menebak siapa Anda (contoh: <em>"Apakah saya anggota Topi Jerami?"</em>). Anggota kru lain akan merespons jujur secara real-time dengan memilih: <strong>YA</strong>, <strong>TIDAK</strong>, atau <strong>MUNGKIN</strong>.
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-                <span style={{
-                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                  color: '#fbbf24',
-                  padding: '0.25rem',
-                  borderRadius: '6px',
-                  fontSize: '0.75rem',
-                  fontWeight: 'bold',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: '1px solid rgba(251, 191, 36, 0.2)',
-                  flexShrink: 0
-                }}>4</span>
-                <div>
-                  <strong style={{ color: '#ffffff', display: 'block', marginBottom: '0.25rem' }}>Menebak dengan Nyawa (❤️)</strong>
-                  Anda dapat menebak nama karakter Anda di sisa waktu giliran. Anda memiliki **3 nyawa (❤️)**. Jika tebakan Anda benar (cocok dengan karakter rahasia Anda), Anda menang secara instan! Waktu penyelesaian tercepat Anda akan dicatat di papan skor akhir.
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -464,11 +405,11 @@ function GameApp() {
   if (room.status === 'LOBBY') {
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col">
-        <div className="flex justify-between items-center mb-6">
-          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2 text-sm">
+        <div className="flex justify-between items-center mb-6 gap-3">
+          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2">
             <LogOut className="w-4 h-4" /> Keluar
           </button>
-          <h1 className="heading-pirate text-2xl flex items-center gap-1 m-0">
+          <h1 className="game-title text-base sm:text-xl flex items-center gap-1 m-0">
             <span>🐌</span> Den Den Trivia
           </h1>
           <div className="relative w-8 h-8">
@@ -553,7 +494,7 @@ function GameApp() {
               <Play className="w-6 h-6" /> Mulai Petualangan!
             </button>
           ) : (
-            <div className="text-center font-serif text-amber-400 animate-pulse bg-stone-900/60 p-4 rounded-lg border border-amber-950">
+            <div className="text-center text-op-yellow animate-pulse bg-op-navy/70 p-4 rounded-lg border-2 border-op-yellow">
               Menunggu kapten (host) memulai pelayaran...
             </div>
           )}
@@ -568,11 +509,11 @@ function GameApp() {
     
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col">
-        <div className="flex justify-between items-center mb-6">
-          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2 text-sm">
+        <div className="flex justify-between items-center mb-6 gap-3">
+          <button onClick={leaveRoom} className="btn-pirate btn-pirate-red px-3 py-2">
             <LogOut className="w-4 h-4" /> Keluar
           </button>
-          <h1 className="heading-pirate text-2xl flex items-center gap-1 m-0">
+          <h1 className="game-title text-base sm:text-xl flex items-center gap-1 m-0">
             <span>🐌</span> Den Den Trivia
           </h1>
           <div className="relative w-8 h-8">
@@ -1026,10 +967,10 @@ function GameApp() {
 
     return (
       <div className="px-4 py-8 min-h-screen flex flex-col justify-center">
-        <h1 className="heading-pirate text-3xl mb-1 flex items-center justify-center gap-1">
+        <h1 className="game-title text-xl sm:text-2xl mb-2 flex items-center justify-center gap-2 leading-relaxed">
           <span>☠️</span> Game Selesai!
         </h1>
-        <p className="text-center text-xs italic text-amber-500 mb-6 font-serif">
+        <p className="text-center text-xs italic text-op-yellow/90 mb-6">
           Semua kru telah mendarat. Berikut hasil catatannya:
         </p>
 
@@ -1140,7 +1081,7 @@ function ChatWidget() {
             </h3>
             <button 
               onClick={() => setChatOpen(false)}
-              className="p-1 rounded hover:bg-white/10 text-amber-500 font-bold text-xs border border-transparent transition-colors"
+              className="p-1 px-2 rounded hover:bg-op-brown/10 text-op-red font-bold text-xs border-2 border-op-brown/30 transition-colors"
             >
               Tutup
             </button>
@@ -1159,17 +1100,17 @@ function ChatWidget() {
                     key={msg.id} 
                     className={`flex flex-col ${isMsgMe ? 'items-end' : 'items-start'}`}
                   >
-                    <div className="flex items-center gap-1.5 mb-0.5 text-[9px] text-amber-700">
-                      {isMsgHost && <Crown className="w-2.5 h-2.5 text-amber-600" />}
-                      <span className={`font-bold ${isMsgMe ? 'text-sky-400' : isMsgHost ? 'text-amber-500' : 'text-stone-300'}`}>
+                    <div className="flex items-center gap-1.5 mb-0.5 text-[9px] text-op-brown/60">
+                      {isMsgHost && <Crown className="w-2.5 h-2.5 text-op-red" />}
+                      <span className={`font-bold ${isMsgMe ? 'text-op-blue' : isMsgHost ? 'text-op-red' : 'text-op-brown'}`}>
                         {msg.senderName}
                       </span>
                       <span>• {msgTime}</span>
                     </div>
-                    <div className={`p-2 rounded-xl max-w-[85%] break-words leading-relaxed ${
+                    <div className={`p-2 rounded-lg max-w-[85%] break-words leading-relaxed border-2 ${
                       isMsgMe 
-                        ? 'bg-sky-950/40 border border-sky-800/60 text-sky-100 rounded-tr-none' 
-                        : 'bg-stone-900/60 border border-stone-800/60 text-stone-200 rounded-tl-none'
+                        ? 'bg-op-sky/30 border-op-blue text-op-brown rounded-tr-none' 
+                        : 'bg-op-white border-op-brown text-op-brown rounded-tl-none'
                     }`}>
                       {msg.text}
                     </div>
@@ -1177,7 +1118,7 @@ function ChatWidget() {
                 );
               })
             ) : (
-              <div className="text-center text-stone-500 py-10 italic">
+              <div className="text-center text-op-brown/50 py-10 italic">
                 Belum ada pesan. Kirim pesan pertama untuk menyapa kru!
               </div>
             )}
@@ -1208,14 +1149,14 @@ function ChatWidget() {
       {/* Toggle Button */}
       <button 
         onClick={() => setChatOpen(!chatOpen)}
-        className={`p-4 rounded-full bg-slate-950/95 border border-amber-500/80 hover:border-amber-400 hover:scale-105 transition-all shadow-lg flex items-center justify-center relative ${
+        className={`p-4 rounded-full bg-op-navy border-[3px] border-op-yellow hover:border-op-white hover:scale-105 transition-all shadow-lg flex items-center justify-center relative ${
           chatOpen ? 'rotate-90' : ''
         }`}
         title="Buka Chat Room"
       >
-        <MessageSquare className="w-6 h-6 text-amber-400" />
+        <MessageSquare className="w-6 h-6 text-op-yellow" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white font-bold text-[9px] w-5 h-5 rounded-full flex items-center justify-center border border-white animate-pulse">
+          <span className="absolute -top-1.5 -right-1.5 bg-op-red text-op-white font-bold text-[9px] w-5 h-5 rounded-full flex items-center justify-center border-2 border-op-white animate-pulse">
             {unreadCount}
           </span>
         )}
