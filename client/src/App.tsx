@@ -1226,22 +1226,14 @@ function GameAppWrapper() {
 export default function App() {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
-  const content = (
-    <AuthProvider>
-      <GameProvider>
-        <GameAppWrapper />
-      </GameProvider>
-    </AuthProvider>
+  return (
+    <GoogleOAuthProvider clientId={clientId || 'unconfigured'}>
+      <AuthProvider>
+        <GameProvider>
+          <GameAppWrapper />
+        </GameProvider>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
-
-  if (clientId) {
-    return (
-      <GoogleOAuthProvider clientId={clientId}>
-        {content}
-      </GoogleOAuthProvider>
-    );
-  }
-
-  return content;
 }
 
