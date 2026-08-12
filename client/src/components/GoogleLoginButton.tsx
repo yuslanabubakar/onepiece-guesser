@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
+import { ProfileModal } from './ProfileModal';
 
 function GoogleLoginButtonInner() {
   const { loginWithProfile } = useAuth();
@@ -50,31 +52,34 @@ function GoogleLoginButtonInner() {
 }
 
 export function GoogleLoginButton() {
-  const { user, stats, logout } = useAuth();
+  const { user, stats } = useAuth();
+  const [showModal, setShowModal] = useState(false);
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   if (user) {
     return (
-      <div className="flex items-center gap-2 bg-amber-950/90 border-2 border-amber-500 rounded-lg px-2.5 py-1 shadow-lg text-amber-100 font-serif">
-        <img
-          src={user.avatarUrl}
-          alt={user.name}
-          className="w-7 h-7 rounded border border-amber-400 object-cover shrink-0"
-        />
-        <div className="flex flex-col text-left leading-tight">
-          <span className="text-xs font-bold truncate max-w-[100px] text-amber-200">{user.name}</span>
-          <span className="text-[9px] text-amber-400/90">
-            {stats ? `Win: ${stats.wins}` : 'Google Member'}
-          </span>
-        </div>
+      <>
         <button
-          onClick={logout}
-          className="text-[10px] font-bold uppercase tracking-wide bg-red-950 hover:bg-red-800 text-red-200 border border-red-500/60 px-1.5 py-0.5 rounded transition-colors ml-1 cursor-pointer"
-          title="Keluar dari akun Google"
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 bg-amber-950/90 hover:bg-amber-900 border-2 border-amber-500 rounded-lg px-2.5 py-1 shadow-lg text-amber-100 font-serif transition-all hover:scale-105 active:scale-95 cursor-pointer text-left"
+          title="Klik untuk melihat statistik Logbook & Profil"
         >
-          Keluar
+          <img
+            src={user.avatarUrl}
+            alt={user.name}
+            className="w-7 h-7 rounded border border-amber-400 object-cover shrink-0"
+          />
+          <div className="flex flex-col text-left leading-tight">
+            <span className="text-xs font-bold truncate max-w-[100px] text-amber-200">{user.name}</span>
+            <span className="text-[9px] text-amber-400/90">
+              {stats ? `Win: ${stats.wins}` : 'Google Member'}
+            </span>
+          </div>
+          <span className="text-xs text-amber-400 ml-0.5">📊</span>
         </button>
-      </div>
+
+        {showModal && <ProfileModal onClose={() => setShowModal(false)} />}
+      </>
     );
   }
 
