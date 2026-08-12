@@ -1,5 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { createContext, useContext, useState, useEffect, useRef, type ReactNode } from 'react';
 import { audioService } from '../services/audio';
 
 export interface Player {
@@ -55,7 +54,6 @@ export interface AlertMessage {
 }
 
 interface GameContextType {
-  socket: Socket | null;
   room: Room | null;
   playerId: string | null;
   playerName: string | null;
@@ -104,7 +102,6 @@ function getSavedRoomId(): string | null {
   const sessionRoom = sessionStorage.getItem('denden_roomId');
   if (sessionRoom) return sessionRoom;
 
-  // Migration fallback from localStorage
   const localRoom = localStorage.getItem('denden_roomId');
   if (localRoom) {
     sessionStorage.setItem('denden_roomId', localRoom);
@@ -136,7 +133,6 @@ function isSessionExpired(): boolean {
 }
 
 export function GameProvider({ children }: { children: ReactNode }) {
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(getOrCreateClientId());
   const [playerName, setPlayerName] = useState<string | null>(localStorage.getItem('denden_playerName'));
@@ -145,213 +141,152 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [isMuted, setIsMuted] = useState<boolean>(localStorage.getItem('denden_muted') === 'true');
   const [connected, setConnected] = useState<boolean>(false);
 
-  // Initialize socket
+  const wsRef = useRef<WebSocket | null>(null);
+
   useEffect(() => {
-    // Connect to VITE_WS_URL if set (production), otherwise fallback to local hostname port 3001
-    const socketUrl = import.meta.env.VITE_WS_URL || `${window.location.protocol}//${window.location.hostname}:3001`;
-    const newSocket = io(socketUrl, {
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
-    });
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/api/ws`;
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSocket(newSocket);
+    console.log('Connecting to Cloudflare Edge WebSocket:', wsUrl);
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
 
-    newSocket.on('connect', () => {
-      console.log('Connected to server');
+    ws.onopen = () => {
+      console.log('Connected to Cloudflare Edge WebSockets ⚡');
       setConnected(true);
-      
-      const savedRoomId = getSavedRoomId();
-      const activePlayerId = getOrCreateClientId();
 
-      if (savedRoomId && activePlayerId) {
+      const savedRoomId = getSavedRoomId();
+      const activeClientId = getOrCreateClientId();
+      const savedName = localStorage.getItem('denden_playerName');
+
+      if (savedRoomId && activeClientId) {
         if (isSessionExpired()) {
-          console.log('Session expired, clearing room session');
           clearRoomSession();
           setRoom(null);
         } else {
-          newSocket.emit('reconnect_player', { roomId: savedRoomId, playerId: activePlayerId });
+          ws.send(
+            JSON.stringify({
+              type: 'join_room',
+              payload: { roomId: savedRoomId, clientId: activeClientId, playerName: savedName || 'Pemain' },
+            })
+          );
         }
       }
-    });
+    };
 
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from server');
-      setConnected(false);
-    });
-
-    newSocket.on('connect_error', (err) => {
-      console.warn('Socket connection error:', err.message);
-      setConnected(false);
-    });
-
-    newSocket.on('room_created', ({ roomId, playerId: newPlayerId, roomState }) => {
-      saveRoomSession(roomId, newPlayerId);
-      setPlayerId(newPlayerId);
-      setRoom(roomState);
-      setError(null);
-    });
-
-    newSocket.on('room_joined', ({ roomId, playerId: newPlayerId, roomState }) => {
-      saveRoomSession(roomId, newPlayerId);
-      setPlayerId(newPlayerId);
-      setRoom(roomState);
-      setError(null);
-    });
-
-    newSocket.on('reconnected', (roomState: Room) => {
-      setRoom(roomState);
-      setError(null);
-    });
-
-    newSocket.on('reconnect_failed', (msg) => {
-      console.log('Reconnect failed:', msg);
-      clearRoomSession();
-      setRoom(null);
-      setError(msg || 'Gagal terhubung kembali ke room. Sesi telah berakhir.');
-    });
-
-    newSocket.on('room_state', (roomState: Room) => {
-      setRoom(roomState);
-    });
-
-    newSocket.on('game_alert', (msg: AlertMessage) => {
-      setAlert(msg);
-      
-      // Play appropriate sound effect
-      if (msg.type === 'success') {
-        audioService.playCorrect();
-      } else if (msg.type === 'danger') {
-        audioService.playWrong();
-      } else {
-        audioService.playClick();
-      }
-      
-      // Clear alert after 5 seconds
-      setTimeout(() => {
-        setAlert((curr) => (curr && curr.message === msg.message ? null : curr));
-      }, 5000);
-    });
-
-    newSocket.on('assignment_failed', (msg: string) => {
-      setError(msg);
-      audioService.playWrong();
-    });
-
-    newSocket.on('kicked', () => {
-      clearRoomSession();
-      setRoom(null);
-      setError('Anda telah ditendang dari room oleh Host');
-      audioService.playWrong();
-    });
-
-    newSocket.on('chat_message', (msg: ChatMessage) => {
-      setRoom((currentRoom) => {
-        if (!currentRoom) return null;
-        const updatedMessages = currentRoom.messages ? [...currentRoom.messages, msg] : [msg];
-        if (updatedMessages.length > 50) {
-          updatedMessages.shift();
+    ws.onmessage = (event) => {
+      try {
+        const { type, data } = JSON.parse(event.data);
+        if (type === 'room_created' || type === 'room_joined') {
+          saveRoomSession(data.roomId, data.playerId);
+          setPlayerId(data.playerId);
+          setRoom(data.room);
+          setError(null);
+        } else if (type === 'room_state') {
+          setRoom(data);
+        } else if (type === 'game_alert') {
+          setAlert(data);
+          if (data.type === 'success') audioService.playCorrect();
+          else if (data.type === 'danger') audioService.playWrong();
+          else audioService.playClick();
+          setTimeout(() => {
+            setAlert((curr) => (curr && curr.message === data.message ? null : curr));
+          }, 5000);
+        } else if (type === 'chat_message') {
+          setRoom((currentRoom) => {
+            if (!currentRoom) return null;
+            const updatedMessages = currentRoom.messages ? [...currentRoom.messages, data] : [data];
+            if (updatedMessages.length > 50) updatedMessages.shift();
+            return { ...currentRoom, messages: updatedMessages };
+          });
+          audioService.playClick();
+        } else if (type === 'reconnect_failed') {
+          clearRoomSession();
+          setRoom(null);
+          setError(data?.message || 'Sesi telah berakhir.');
         }
-        return {
-          ...currentRoom,
-          messages: updatedMessages,
-        };
-      });
-      // Play a click sound on new chat messages
-      audioService.playClick();
-    });
+      } catch (err) {
+        console.error('Failed to parse WebSocket message:', err);
+      }
+    };
 
-    newSocket.on('error', (msg: string) => {
-      setError(msg);
-      audioService.playWrong();
-    });
+    ws.onerror = (err) => {
+      console.warn('WebSocket connection error:', err);
+      setConnected(false);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+      setConnected(false);
+    };
 
     return () => {
-      newSocket.close();
+      ws.close();
     };
   }, []);
 
-
-
-  // Sync mute state with localStorage & service
   useEffect(() => {
     localStorage.setItem('denden_muted', String(isMuted));
     audioService.setMuted(isMuted);
   }, [isMuted]);
 
+  const send = (type: string, payload: unknown) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type, payload }));
+    } else {
+      setError('Belum terhubung ke Cloudflare Edge WebSocket. Silakan coba lagi.');
+      audioService.playWrong();
+    }
+  };
+
   const clearError = () => setError(null);
   const clearAlert = () => setAlert(null);
 
   const createRoom = (name: string, avatarUrl?: string | null) => {
-    if (socket && socket.connected) {
-      localStorage.setItem('denden_playerName', name);
-      setPlayerName(name);
-      const activeClientId = getOrCreateClientId();
-      socket.emit('create_room', { playerName: name, playerId: activeClientId, avatarUrl });
-    } else {
-      setError('Belum terhubung ke server. Pastikan server berjalan, lalu coba lagi.');
-      audioService.playWrong();
-    }
+    localStorage.setItem('denden_playerName', name);
+    setPlayerName(name);
+    const activeClientId = getOrCreateClientId();
+    send('create_room', { playerName: name, clientId: activeClientId, avatarUrl });
   };
 
   const joinRoom = (roomId: string, name: string, avatarUrl?: string | null) => {
-    if (socket && socket.connected) {
-      localStorage.setItem('denden_playerName', name);
-      setPlayerName(name);
-      const activeClientId = getOrCreateClientId();
-      socket.emit('join_room', { roomId, playerName: name, playerId: activeClientId, avatarUrl });
-    } else {
-      setError('Belum terhubung ke server. Pastikan server berjalan, lalu coba lagi.');
-      audioService.playWrong();
-    }
+    localStorage.setItem('denden_playerName', name);
+    setPlayerName(name);
+    const activeClientId = getOrCreateClientId();
+    send('join_room', { roomId, playerName: name, clientId: activeClientId, avatarUrl });
   };
 
   const submitSuggestions = (suggestions: string[]) => {
-    if (socket && room && playerId) {
-      socket.emit('submit_suggestions', { roomId: room.id, playerId, suggestions });
-    }
+    send('submit_suggestions', { suggestions });
   };
 
   const submitQuestion = (questionText: string) => {
-    if (socket && room && playerId) {
-      socket.emit('submit_question', { roomId: room.id, playerId, questionText });
-    }
+    send('submit_question', { questionText });
   };
 
   const submitQuestionReaction = (reaction: 'ya' | 'tidak' | 'mungkin') => {
-    if (socket && room && playerId) {
-      socket.emit('submit_question_reaction', { roomId: room.id, playerId, reaction });
-    }
+    send('answer_question', { reaction });
   };
 
   const skipGuessing = () => {
-    if (socket && room && playerId) {
-      socket.emit('skip_guessing', { roomId: room.id, playerId });
-    }
+    send('skip_guessing', {});
   };
 
   const guessNow = () => {
-    if (socket && room && playerId) {
-      socket.emit('guess_now', { roomId: room.id, playerId });
-    }
+    send('guess_now', {});
   };
 
   const submitGuess = (characterName: string) => {
-    if (socket && room && playerId) {
-      socket.emit('submit_guess', { roomId: room.id, playerId, characterName });
-    }
+    send('submit_guess', { characterName });
   };
 
   const startGame = () => {
-    if (socket && room && playerId) {
-      socket.emit('start_game', { roomId: room.id, playerId });
-    }
+    send('start_game', {});
   };
 
   const restartGame = () => {
-    if (socket && room && playerId) {
-      socket.emit('restart_game', { roomId: room.id, playerId });
-    }
+    send('start_game', {});
   };
 
   const toggleMute = () => {
@@ -359,31 +294,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
   };
 
   const leaveRoom = () => {
-    if (socket && room && playerId) {
-      socket.emit('leave_room', { roomId: room.id, playerId });
-    }
+    send('leave_room', {});
     clearRoomSession();
     setRoom(null);
   };
 
   const kickPlayer = (targetPlayerId: string) => {
-    if (socket && room && playerId) {
-      socket.emit('kick_player', { roomId: room.id, playerId, targetPlayerId });
-    }
+    send('kick_player', { targetPlayerId });
   };
 
   const sendChatMessage = (text: string) => {
-    if (socket && socket.connected && room && playerId) {
-      socket.emit('send_chat_message', { roomId: room.id, playerId, text });
-    } else {
-      setError('Belum terhubung ke server. Pesan tidak terkirim.');
-    }
+    send('chat_message', { text });
   };
 
   return (
     <GameContext.Provider
       value={{
-        socket,
         room,
         playerId,
         playerName,

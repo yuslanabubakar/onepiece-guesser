@@ -302,7 +302,7 @@ function GameApp() {
                 : 'bg-op-red/20 border-op-red text-op-white'
             }`}>
               <span className={`w-2 h-2 rounded-full ${connected ? 'bg-[#2f9e44]' : 'bg-op-red animate-pulse'}`}></span>
-              {connected ? 'Terhubung ke server' : 'Menyambung ke server...'}
+              {connected ? 'Terhubung ke Cloudflare Edge ⚡' : 'Menyambung ke Edge...'}
             </span>
           </div>
         </div>
