@@ -1,9 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "onepiece-guesser",
-  "pages_build_output_dir": "./client/dist",
+  "pages_build_output_dir": "dist",
   "vars": {
-    "VITE_GOOGLE_CLIENT_ID": "997290240654-kcrbpudufvkucplu7t1979ni1bt47uii.apps.googleusercontent.com"
+    "VITE_GOOGLE_CLIENT_ID": "997290240654-kcrbpudufvkucplu7t1979ni1bt47uii.apps.googleusercontent.com",
+    "VITE_WS_URL": "https://onepiece-guesser.onrender.com"
   },
   "d1_databases": [
     {
