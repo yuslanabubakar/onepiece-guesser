@@ -5,6 +5,7 @@ import { audioService } from '../services/audio';
 export interface Player {
   id: string;
   name: string;
+  avatarUrl?: string | null;
   socketId: string | null;
   suggestions: string[];
   assignedCharacter: string | null;
@@ -64,8 +65,8 @@ interface GameContextType {
   connected: boolean;
   clearError: () => void;
   clearAlert: () => void;
-  createRoom: (name: string) => void;
-  joinRoom: (roomId: string, name: string) => void;
+  createRoom: (name: string, avatarUrl?: string | null) => void;
+  joinRoom: (roomId: string, name: string, avatarUrl?: string | null) => void;
   submitSuggestions: (suggestions: string[]) => void;
   submitQuestion: (text: string) => void;
   submitQuestionReaction: (reaction: 'ya' | 'tidak' | 'mungkin') => void;
@@ -82,10 +83,62 @@ interface GameContextType {
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
+function generateClientId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'client_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+}
+
+function getOrCreateClientId(): string {
+  let clientId = localStorage.getItem('denden_clientId') || localStorage.getItem('denden_playerId');
+  if (!clientId) {
+    clientId = generateClientId();
+  }
+  localStorage.setItem('denden_clientId', clientId);
+  localStorage.setItem('denden_playerId', clientId);
+  return clientId;
+}
+
+function getSavedRoomId(): string | null {
+  const sessionRoom = sessionStorage.getItem('denden_roomId');
+  if (sessionRoom) return sessionRoom;
+
+  // Migration fallback from localStorage
+  const localRoom = localStorage.getItem('denden_roomId');
+  if (localRoom) {
+    sessionStorage.setItem('denden_roomId', localRoom);
+    localStorage.removeItem('denden_roomId');
+    return localRoom;
+  }
+  return null;
+}
+
+function saveRoomSession(roomId: string, playerId: string) {
+  sessionStorage.setItem('denden_roomId', roomId);
+  sessionStorage.setItem('denden_roomTimestamp', Date.now().toString());
+  localStorage.setItem('denden_clientId', playerId);
+  localStorage.setItem('denden_playerId', playerId);
+}
+
+function clearRoomSession() {
+  sessionStorage.removeItem('denden_roomId');
+  sessionStorage.removeItem('denden_roomTimestamp');
+  localStorage.removeItem('denden_roomId');
+}
+
+function isSessionExpired(): boolean {
+  const ts = sessionStorage.getItem('denden_roomTimestamp');
+  if (!ts) return false;
+  const elapsed = Date.now() - parseInt(ts, 10);
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+  return elapsed > TWO_HOURS_MS;
+}
+
 export function GameProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
-  const [playerId, setPlayerId] = useState<string | null>(localStorage.getItem('denden_playerId'));
+  const [playerId, setPlayerId] = useState<string | null>(getOrCreateClientId());
   const [playerName, setPlayerName] = useState<string | null>(localStorage.getItem('denden_playerName'));
   const [error, setError] = useState<string | null>(null);
   const [alert, setAlert] = useState<AlertMessage | null>(null);
@@ -101,16 +154,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
       autoConnect: true,
     });
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
       console.log('Connected to server');
       setConnected(true);
-      // If we have saved credentials, try to reconnect
-      const savedRoomId = localStorage.getItem('denden_roomId');
-      const savedPlayerId = localStorage.getItem('denden_playerId');
-      if (savedRoomId && savedPlayerId) {
-        newSocket.emit('reconnect_player', { roomId: savedRoomId, playerId: savedPlayerId });
+      
+      const savedRoomId = getSavedRoomId();
+      const activePlayerId = getOrCreateClientId();
+
+      if (savedRoomId && activePlayerId) {
+        if (isSessionExpired()) {
+          console.log('Session expired, clearing room session');
+          clearRoomSession();
+          setRoom(null);
+        } else {
+          newSocket.emit('reconnect_player', { roomId: savedRoomId, playerId: activePlayerId });
+        }
       }
     });
 
@@ -125,16 +186,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
     });
 
     newSocket.on('room_created', ({ roomId, playerId: newPlayerId, roomState }) => {
-      localStorage.setItem('denden_roomId', roomId);
-      localStorage.setItem('denden_playerId', newPlayerId);
+      saveRoomSession(roomId, newPlayerId);
       setPlayerId(newPlayerId);
       setRoom(roomState);
       setError(null);
     });
 
     newSocket.on('room_joined', ({ roomId, playerId: newPlayerId, roomState }) => {
-      localStorage.setItem('denden_roomId', roomId);
-      localStorage.setItem('denden_playerId', newPlayerId);
+      saveRoomSession(roomId, newPlayerId);
       setPlayerId(newPlayerId);
       setRoom(roomState);
       setError(null);
@@ -147,9 +206,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('reconnect_failed', (msg) => {
       console.log('Reconnect failed:', msg);
-      // Clean up localStorage
-      localStorage.removeItem('denden_roomId');
+      clearRoomSession();
       setRoom(null);
+      setError(msg || 'Gagal terhubung kembali ke room. Sesi telah berakhir.');
     });
 
     newSocket.on('room_state', (roomState: Room) => {
@@ -180,7 +239,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     });
 
     newSocket.on('kicked', () => {
-      localStorage.removeItem('denden_roomId');
+      clearRoomSession();
       setRoom(null);
       setError('Anda telah ditendang dari room oleh Host');
       audioService.playWrong();
@@ -207,9 +266,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
       audioService.playWrong();
     });
 
-    // Mute sync
-    audioService.setMuted(isMuted);
-
     return () => {
       newSocket.close();
     };
@@ -226,22 +282,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const clearError = () => setError(null);
   const clearAlert = () => setAlert(null);
 
-  const createRoom = (name: string) => {
+  const createRoom = (name: string, avatarUrl?: string | null) => {
     if (socket && socket.connected) {
       localStorage.setItem('denden_playerName', name);
       setPlayerName(name);
-      socket.emit('create_room', { playerName: name });
+      const activeClientId = getOrCreateClientId();
+      socket.emit('create_room', { playerName: name, playerId: activeClientId, avatarUrl });
     } else {
       setError('Belum terhubung ke server. Pastikan server berjalan, lalu coba lagi.');
       audioService.playWrong();
     }
   };
 
-  const joinRoom = (roomId: string, name: string) => {
+  const joinRoom = (roomId: string, name: string, avatarUrl?: string | null) => {
     if (socket && socket.connected) {
       localStorage.setItem('denden_playerName', name);
       setPlayerName(name);
-      socket.emit('join_room', { roomId, playerName: name, playerId });
+      const activeClientId = getOrCreateClientId();
+      socket.emit('join_room', { roomId, playerName: name, playerId: activeClientId, avatarUrl });
     } else {
       setError('Belum terhubung ke server. Pastikan server berjalan, lalu coba lagi.');
       audioService.playWrong();
@@ -304,7 +362,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     if (socket && room && playerId) {
       socket.emit('leave_room', { roomId: room.id, playerId });
     }
-    localStorage.removeItem('denden_roomId');
+    clearRoomSession();
     setRoom(null);
   };
 
@@ -356,6 +414,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useGame() {
   const context = useContext(GameContext);
   if (context === undefined) {

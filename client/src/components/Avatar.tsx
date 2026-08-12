@@ -19,7 +19,7 @@ const CREW_COLORS: CrewColor[] = [
   { bg: '#0b3075', fg: '#f8de3c' }, // navy + gold
 ];
 
-export function getCrewColor(id: string): CrewColor {
+function getCrewColor(id: string): CrewColor {
   let hash = 0;
   for (let i = 0; i < id.length; i++) {
     hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
@@ -30,14 +30,29 @@ export function getCrewColor(id: string): CrewColor {
 interface AvatarProps {
   id: string;
   name: string;
+  avatarUrl?: string | null;
   /** Pixel size of the square badge. Defaults to 32. */
   size?: number;
   className?: string;
 }
 
-export function Avatar({ id, name, size = 32, className = '' }: AvatarProps) {
+export function Avatar({ id, name, avatarUrl, size = 32, className = '' }: AvatarProps) {
   const { bg, fg } = getCrewColor(id);
   const initial = (name.trim()[0] || '?').toUpperCase();
+
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={`Avatar ${name}`}
+        className={`crew-avatar object-cover rounded-md ${className}`}
+        style={{
+          width: size,
+          height: size,
+        }}
+      />
+    );
+  }
 
   return (
     <span

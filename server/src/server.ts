@@ -20,6 +20,7 @@ const io = new Server(server, {
 interface Player {
   id: string;
   name: string;
+  avatarUrl?: string | null;
   socketId: string | null;
   suggestions: string[];
   assignedCharacter: string | null;
@@ -192,18 +193,19 @@ io.on('connection', (socket: Socket) => {
   console.log(`User connected: ${socket.id}`);
 
   // Create Room
-  socket.on('create_room', ({ playerName }: { playerName: string }) => {
+  socket.on('create_room', ({ playerName, playerId, avatarUrl }: { playerName: string; playerId?: string; avatarUrl?: string | null }) => {
     if (!playerName || playerName.trim() === '') {
       socket.emit('error', 'Nama pemain tidak boleh kosong');
       return;
     }
 
     const roomId = uuidv4().slice(0, 6).toUpperCase();
-    const playerId = uuidv4();
+    const hostId = playerId || uuidv4();
 
     const host: Player = {
-      id: playerId,
+      id: hostId,
       name: playerName.trim(),
+      avatarUrl: avatarUrl || null,
       socketId: socket.id,
       suggestions: [],
       assignedCharacter: null,
@@ -215,7 +217,7 @@ io.on('connection', (socket: Socket) => {
 
     rooms[roomId] = {
       id: roomId,
-      hostId: playerId,
+      hostId: hostId,
       players: [host],
       status: 'LOBBY',
       turnIndex: 0,
@@ -228,14 +230,14 @@ io.on('connection', (socket: Socket) => {
     };
 
     socket.join(roomId);
-    socket.emit('room_created', { roomId, playerId, roomState: rooms[roomId] });
+    socket.emit('room_created', { roomId, playerId: hostId, roomState: rooms[roomId] });
     console.log(`Room created: ${roomId} by host ${playerName}`);
   });
 
   // Join Room
   socket.on(
     'join_room',
-    ({ roomId, playerName, playerId }: { roomId: string; playerName: string; playerId?: string }) => {
+    ({ roomId, playerName, playerId, avatarUrl }: { roomId: string; playerName: string; playerId?: string; avatarUrl?: string | null }) => {
       const id = roomId ? roomId.toUpperCase() : '';
       const room = rooms[id];
 
@@ -263,6 +265,8 @@ io.on('connection', (socket: Socket) => {
 
       if (player) {
         player.socketId = socket.id;
+        player.name = playerName.trim();
+        if (avatarUrl) player.avatarUrl = avatarUrl;
         // Clear host transfer timeout if this player is the host
         if (room.hostId === player.id) {
           if (hostTransferTimeouts[id]) {
@@ -281,6 +285,7 @@ io.on('connection', (socket: Socket) => {
         player = {
           id: newPlayerId,
           name: playerName.trim(),
+          avatarUrl: avatarUrl || null,
           socketId: socket.id,
           suggestions: [],
           assignedCharacter: null,

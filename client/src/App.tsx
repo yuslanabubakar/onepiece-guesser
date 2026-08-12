@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GameProvider, useGame } from './context/GameContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import { GoogleLoginButton } from './components/GoogleLoginButton';
 import { popularCharacters } from './data/characters';
 import { audioService } from './services/audio';
 import { PixelIcon } from './components/PixelIcon';
@@ -100,12 +103,15 @@ function TimerCountdown({ expiryEpoch }: { expiryEpoch: number | null }) {
 
   useEffect(() => {
     if (!expiryEpoch) {
-      setTimeLeft(0);
       lastTickRef.current = -1;
       return;
     }
 
-    const updateTimer = () => {
+    const initialRemaining = Math.max(0, Math.ceil((expiryEpoch - Date.now()) / 1000));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTimeLeft(initialRemaining);
+
+    const interval = setInterval(() => {
       const remaining = Math.max(0, Math.ceil((expiryEpoch - Date.now()) / 1000));
       setTimeLeft(remaining);
 
@@ -114,10 +120,7 @@ function TimerCountdown({ expiryEpoch }: { expiryEpoch: number | null }) {
         lastTickRef.current = remaining;
         audioService.playTick();
       }
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 100);
+    }, 100);
 
     return () => clearInterval(interval);
   }, [expiryEpoch]);
@@ -146,11 +149,18 @@ function GameApp() {
     submitQuestion, submitQuestionReaction, skipGuessing, guessNow, submitGuess,
     startGame, restartGame, toggleMute, leaveRoom, kickPlayer
   } = useGame();
+  const { user } = useAuth();
 
-  const [inputName, setInputName] = useState(playerName || '');
-  const [inputRoomId, setInputRoomId] = useState('');
+  const [inputName, setInputName] = useState(() => user?.name || playerName || '');
+  const [inputRoomId, setInputRoomId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomCode = params.get('room');
+    if (roomCode) return roomCode.toUpperCase();
+    const savedRoom = sessionStorage.getItem('denden_roomId') || localStorage.getItem('denden_roomId');
+    return savedRoom ? savedRoom.toUpperCase() : '';
+  });
   const [localError, setLocalError] = useState<string | null>(null);
-  
+
   // Suggestion screen state
   const [sug1, setSug1] = useState('');
   const [sug2, setSug2] = useState('');
@@ -160,15 +170,6 @@ function GameApp() {
   const [questionText, setQuestionText] = useState('');
   const [guessName, setGuessName] = useState('');
   const [copied, setCopied] = useState(false);
-
-  // Auto-fill room code from URL query parameter
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const roomCode = params.get('room');
-    if (roomCode) {
-      setInputRoomId(roomCode.toUpperCase());
-    }
-  }, []);
 
   // Confetti effect on victory
   useEffect(() => {
@@ -182,7 +183,7 @@ function GameApp() {
         });
       }
     }
-  }, [room?.status]);
+  }, [room]);
 
   const handleCopyLink = () => {
     if (!room) return;
@@ -213,7 +214,7 @@ function GameApp() {
       return;
     }
     setLocalError(null);
-    createRoom(inputName);
+    createRoom(inputName, user?.avatarUrl);
   };
 
   const handleJoinClick = () => {
@@ -222,11 +223,11 @@ function GameApp() {
       return;
     }
     if (!inputRoomId.trim()) {
-      setLocalError("Kode Room tidak boleh kosong!");
+      setLocalError("Kode room tidak boleh kosong!");
       return;
     }
     setLocalError(null);
-    joinRoom(inputRoomId.toUpperCase(), inputName);
+    joinRoom(inputRoomId, inputName, user?.avatarUrl);
   };
 
   const handleRandomizeSuggestions = () => {
@@ -240,7 +241,9 @@ function GameApp() {
     e.preventDefault();
     const suggestions = [sug1, sug2, sug3].filter((s) => s.trim() !== '');
     if (suggestions.length === 0) {
-      alert?.message ? null : clearError();
+      if (!alert?.message) {
+        clearError();
+      }
       return;
     }
     submitSuggestions(suggestions);
@@ -262,23 +265,29 @@ function GameApp() {
     }
   };
 
-  // Render Mute Button (Persistent UI element)
-  const renderMuteToggle = () => (
-    <button 
-      onClick={toggleMute}
-      className="absolute top-2 right-2 p-2 rounded-md bg-op-yellow hover:bg-op-white text-op-brown border-2 border-op-brown transition-colors z-50"
-      title={isMuted ? 'Bunyikan suara' : 'Bisukan suara'}
-      aria-label={isMuted ? 'Bunyikan suara' : 'Bisukan suara'}
-      aria-pressed={isMuted}
-    >
-      {isMuted ? <PixelIcon name="volume-off" className="w-5 h-5" /> : <PixelIcon name="volume-on" className="w-5 h-5 animate-pulse" />}
-    </button>
+  // Render Mute & Auth Top Navigation
+  const renderTopNav = () => (
+    <div className="flex items-center gap-2 z-50">
+      <GoogleLoginButton />
+      <button 
+        onClick={toggleMute}
+        className="p-2 rounded-md bg-op-yellow hover:bg-op-white text-op-brown border-2 border-op-brown transition-colors shadow-md cursor-pointer shrink-0"
+        title={isMuted ? 'Bunyikan suara' : 'Bisukan suara'}
+        aria-label={isMuted ? 'Bunyikan suara' : 'Bisukan suara'}
+        aria-pressed={isMuted}
+      >
+        {isMuted ? <PixelIcon name="volume-off" className="w-5 h-5" /> : <PixelIcon name="volume-on" className="w-5 h-5 animate-pulse" />}
+      </button>
+    </div>
   );
 
   // 1. Lobby Setup Screen (Create or Join)
   if (!room) {
     return (
       <div className="lobby-container">
+        <div className="flex justify-end mb-2">
+          {renderTopNav()}
+        </div>
         <div className="lobby-header-section text-center">
           <h1 className="game-title text-xl sm:text-3xl mb-3 flex flex-wrap items-center justify-center gap-2 leading-relaxed">
             <span className="snail-icon-container"><PixelIcon name="snail" className="w-7 h-7 sm:w-9 sm:h-9" /></span> Den Den Trivia
@@ -317,7 +326,6 @@ function GameApp() {
 
         <div className="lobby-grid">
           <div className="logbook-card">
-            {renderMuteToggle()}
             <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
               <h2 className="heading-pirate text-xl text-left border-b-2 border-amber-950 pb-2">Buat atau Gabung Logbook</h2>
               <div>
@@ -433,9 +441,7 @@ function GameApp() {
           <h1 className="game-title text-base sm:text-xl flex items-center gap-1 m-0">
             <span className="snail-icon-container"><PixelIcon name="snail" className="w-5 h-5 sm:w-6 sm:h-6" /></span> Den Den Trivia
           </h1>
-          <div className="relative w-8 h-8">
-            {renderMuteToggle()}
-          </div>
+          {renderTopNav()}
         </div>
 
         {error && (
@@ -483,7 +489,7 @@ function GameApp() {
             {room.players.map((p) => (
               <div key={p.id} className="player-row">
                 <span className="flex items-center gap-2 font-semibold">
-                  <Avatar id={p.id} name={p.name} size={28} />
+                  <Avatar id={p.id} name={p.name} avatarUrl={p.avatarUrl} size={28} />
                   {room.hostId === p.id && <PixelIcon name="crown" className="w-4 h-4 text-amber-600" title="Kapten / Host" />}
                   {p.name} {p.id === playerId ? '(Anda)' : ''}
                 </span>
@@ -539,9 +545,7 @@ function GameApp() {
           <h1 className="game-title text-base sm:text-xl flex items-center gap-1 m-0">
             <span className="snail-icon-container"><PixelIcon name="snail" className="w-5 h-5 sm:w-6 sm:h-6" /></span> Den Den Trivia
           </h1>
-          <div className="relative w-8 h-8">
-            {renderMuteToggle()}
-          </div>
+          {renderTopNav()}
         </div>
 
         {error && (
@@ -653,7 +657,7 @@ function GameApp() {
                       }`}
                     >
                       <span className="flex items-center gap-1.5 min-w-0">
-                        <Avatar id={p.id} name={p.name} size={22} />
+                        <Avatar id={p.id} name={p.name} avatarUrl={p.avatarUrl} size={22} />
                         <span className="truncate">{p.name}</span>
                       </span>
                       <span>{submitted ? <PixelIcon name="check" className="w-4 h-4" title="Sudah mengirim usulan" /> : <PixelIcon name="pen" className="w-4 h-4" title="Belum mengirim usulan" />}</span>
@@ -704,9 +708,7 @@ function GameApp() {
             </div>
           </div>
           
-          <div className="relative w-8 h-8">
-            {renderMuteToggle()}
-          </div>
+          {renderTopNav()}
         </div>
 
         <div className="game-layout-grid">
@@ -961,7 +963,7 @@ function GameApp() {
                       } ${p.hasGuessedCorrectly ? 'correct border-green-700 bg-green-50/50' : ''} ${p.failedToGuess ? 'failed border-red-700 bg-red-50/50' : ''}`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <Avatar id={p.id} name={p.name} size={30} />
+                        <Avatar id={p.id} name={p.name} avatarUrl={p.avatarUrl} size={30} />
                         <div className="flex flex-col font-serif font-semibold truncate max-w-[130px]">
                           <div className="flex items-center gap-1">
                             {room.hostId === p.id && <PixelIcon name="crown" className="w-3 h-3 text-amber-600 flex-shrink-0" title="Kapten / Host" />}
@@ -1031,7 +1033,7 @@ function GameApp() {
                   >
                     <div className="flex justify-between items-center font-bold">
                       <span className="flex items-center gap-2">
-                        <Avatar id={p.id} name={p.name} size={28} />
+                        <Avatar id={p.id} name={p.name} avatarUrl={p.avatarUrl} size={28} />
                         {p.id === playerId ? '(Anda) ' : ''}
                         {p.name}
                       </span>
@@ -1089,19 +1091,17 @@ function ChatWidget() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const totalMessages = room?.messages?.length || 0;
-  const unreadCount = chatOpen ? 0 : totalMessages - lastReadMessageCount;
+  const unreadCount = chatOpen ? 0 : Math.max(0, totalMessages - lastReadMessageCount);
 
-  useEffect(() => {
-    if (chatOpen && room?.messages) {
-      setLastReadMessageCount(room.messages.length);
-    }
-  }, [room?.messages?.length, chatOpen]);
+  if (chatOpen && lastReadMessageCount !== totalMessages) {
+    setLastReadMessageCount(totalMessages);
+  }
 
   useEffect(() => {
     if (chatOpen) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [room?.messages?.length, chatOpen]);
+  }, [room?.messages, chatOpen]);
 
   if (!room) return null;
 
@@ -1224,10 +1224,24 @@ function GameAppWrapper() {
 }
 
 export default function App() {
-  return (
-    <GameProvider>
-      <GameAppWrapper />
-    </GameProvider>
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
+  const content = (
+    <AuthProvider>
+      <GameProvider>
+        <GameAppWrapper />
+      </GameProvider>
+    </AuthProvider>
   );
+
+  if (clientId) {
+    return (
+      <GoogleOAuthProvider clientId={clientId}>
+        {content}
+      </GoogleOAuthProvider>
+    );
+  }
+
+  return content;
 }
 

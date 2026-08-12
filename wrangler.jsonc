@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "onepiece-guesser",
+  "pages_build_output_dir": "./client/dist",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "denden-db",
+      "database_id": "b1514ba5-f90a-4437-83a6-45fc5f07bb8e"
+    }
+  ]
+}

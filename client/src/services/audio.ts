@@ -7,7 +7,8 @@ let isMuted = false;
 function getAudioContext(): AudioContext | null {
   if (isMuted) return null;
   if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const webkitAudio = (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    audioCtx = new (window.AudioContext || webkitAudio)();
   }
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
